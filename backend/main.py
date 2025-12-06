@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Clip Composer - á¤óŸLÕ¡¤ë
-Õ;èÆĞÃ¯¨óÉn¨óÈêüİ¤óÈ
+Clip Composer - Backend Main Entry Point
+å‹•ç”»å‡¦ç†ã‚¨ãƒ³ã‚¸ãƒ³ã®ãƒ¡ã‚¤ãƒ³ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«
 """
 
 import argparse
@@ -10,7 +10,7 @@ from datetime import datetime
 
 
 def setup_logger():
-    """í¬ün»ÃÈ¢Ã×"""
+    """ãƒ­ã‚¬ãƒ¼ã®ã‚»ãƒƒãƒˆã‚¢ãƒƒãƒ—"""
     def log(message, level="INFO"):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[{timestamp}] [{level}] {message}")
@@ -18,98 +18,98 @@ def setup_logger():
 
 
 def run_test(logger):
-    """Æ¹ÈŸL"""
+    """ãƒ†ã‚¹ãƒˆå®Ÿè¡Œ"""
     logger("=" * 50)
-    logger("Clip Composer - Æ¹ÈâüÉwÕ")
+    logger("Clip Composer - ãƒ†ã‚¹ãƒˆãƒ¢ãƒ¼ãƒ‰é–‹å§‹")
     logger("=" * 50)
 
-    # Python°ƒÅ1
+    # Pythonãƒãƒ¼ã‚¸ãƒ§ãƒ³ç¢ºèª
     logger(f"Python version: {sys.version}")
 
-    # â¸åüën¤óİüÈÆ¹È
+    # ãƒ©ã‚¤ãƒ–ãƒ©ãƒªã®ã‚¤ãƒ³ãƒãƒ¼ãƒˆãƒ†ã‚¹ãƒˆ
     try:
         import moviepy
         logger(f"moviepy: {moviepy.__version__}")
     except ImportError as e:
-        logger(f"moviepy: ¤óİüÈ¨éü - {e}", "ERROR")
+        logger(f"moviepy: ã‚¤ãƒ³ãƒãƒ¼ãƒˆã‚¨ãƒ©ãƒ¼ - {e}", "ERROR")
 
     try:
         import pandas
         logger(f"pandas: {pandas.__version__}")
     except ImportError as e:
-        logger(f"pandas: ¤óİüÈ¨éü - {e}", "ERROR")
+        logger(f"pandas: ã‚¤ãƒ³ãƒãƒ¼ãƒˆã‚¨ãƒ©ãƒ¼ - {e}", "ERROR")
 
     try:
         import cv2
         logger(f"opencv-python: {cv2.__version__}")
     except ImportError as e:
-        logger(f"opencv-python: ¤óİüÈ¨éü - {e}", "ERROR")
+        logger(f"opencv-python: ã‚¤ãƒ³ãƒãƒ¼ãƒˆã‚¨ãƒ©ãƒ¼ - {e}", "ERROR")
 
     try:
         import PIL
         logger(f"Pillow: {PIL.__version__}")
     except ImportError as e:
-        logger(f"Pillow: ¤óİüÈ¨éü - {e}", "ERROR")
+        logger(f"Pillow: ã‚¤ãƒ³ãƒãƒ¼ãƒˆã‚¨ãƒ©ãƒ¼ - {e}", "ERROR")
 
     try:
         import numpy
         logger(f"numpy: {numpy.__version__}")
     except ImportError as e:
-        logger(f"numpy: ¤óİüÈ¨éü - {e}", "ERROR")
+        logger(f"numpy: ã‚¤ãƒ³ãƒãƒ¼ãƒˆã‚¨ãƒ©ãƒ¼ - {e}", "ERROR")
 
-    # video_processorâ¸åüën¤óİüÈÆ¹È
+    # VideoProcessorã®ã‚¤ãƒ³ãƒãƒ¼ãƒˆãƒ†ã‚¹ãƒˆ
     try:
         from modules.video_processor import VideoProcessor
-        logger("VideoProcessor: ¤óİüÈŸ")
+        logger("VideoProcessor: ã‚¤ãƒ³ãƒãƒ¼ãƒˆæˆåŠŸ")
 
-        # VideoProcessornÆ¹È
+        # VideoProcessorã®ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹åŒ–ãƒ†ã‚¹ãƒˆ
         processor = VideoProcessor()
-        logger("VideoProcessor: ¤ó¹¿ó¹Ÿ")
+        logger("VideoProcessor: ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹åŒ–æˆåŠŸ")
     except ImportError as e:
-        logger(f"VideoProcessor: ¤óİüÈ¨éü - {e}", "ERROR")
+        logger(f"VideoProcessor: ã‚¤ãƒ³ãƒãƒ¼ãƒˆã‚¨ãƒ©ãƒ¼ - {e}", "ERROR")
     except Exception as e:
-        logger(f"VideoProcessor: ¨éü - {e}", "ERROR")
+        logger(f"VideoProcessor: ã‚¨ãƒ©ãƒ¼ - {e}", "ERROR")
 
     logger("=" * 50)
-    logger("Æ¹ÈŒ†")
+    logger("ãƒ†ã‚¹ãƒˆå®Œäº†")
     logger("=" * 50)
 
 
 def main():
-    """á¤óæ"""
+    """ãƒ¡ã‚¤ãƒ³é–¢æ•°"""
     logger = setup_logger()
 
-    # ³ŞóÉé¤ópnÑü¹
+    # ã‚³ãƒãƒ³ãƒ‰ãƒ©ã‚¤ãƒ³å¼•æ•°ã®ãƒ‘ãƒ¼ã‚¹
     parser = argparse.ArgumentParser(
-        description="Clip Composer - Õ;èÆĞÃ¯¨óÉ"
+        description="Clip Composer - å‹•ç”»å‡¦ç†ã‚¨ãƒ³ã‚¸ãƒ³"
     )
     parser.add_argument(
         "--test",
         action="store_true",
-        help="Æ¹ÈâüÉgŸL"
+        help="ãƒ†ã‚¹ãƒˆãƒ¢ãƒ¼ãƒ‰ã§å®Ÿè¡Œ"
     )
     parser.add_argument(
         "--input",
         type=str,
-        help="e›Õ;Õ¡¤ëÑ¹"
+        help="å…¥åŠ›å‹•ç”»ãƒ•ã‚¡ã‚¤ãƒ«ãƒ‘ã‚¹"
     )
     parser.add_argument(
         "--output",
         type=str,
-        help="ú›Õ;Õ¡¤ëÑ¹"
+        help="å‡ºåŠ›å‹•ç”»ãƒ•ã‚¡ã‚¤ãƒ«ãƒ‘ã‚¹"
     )
 
     args = parser.parse_args()
 
-    # Æ¹ÈâüÉ
+    # ãƒ†ã‚¹ãƒˆãƒ¢ãƒ¼ãƒ‰
     if args.test:
         run_test(logger)
         return
 
-    # 8âüÉÊŒŸÅˆš	
-    logger("Clip Composer - 8âüÉ")
-    logger("D¹: python main.py --test gÆ¹ÈŸL")
-    logger("s0: python main.py --help")
+    # é€šå¸¸èµ·å‹•æ™‚ã®ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸
+    logger("Clip Composer - èµ·å‹•")
+    logger("ãƒ’ãƒ³ãƒˆ: python main.py --test ã§ãƒ†ã‚¹ãƒˆå®Ÿè¡Œ")
+    logger("è©³ç´°: python main.py --help")
 
 
 if __name__ == "__main__":
