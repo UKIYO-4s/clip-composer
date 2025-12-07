@@ -48,18 +48,18 @@
 }
 
 @layer components {
-  /* Clip colors */
+  /* Clip colors - 100%不透明で視認性確保 */
   .clip-video {
-    @apply bg-clip-video/20 border-clip-video;
+    @apply bg-clip-video border-clip-video;
   }
   .clip-text {
-    @apply bg-clip-text/20 border-clip-text;
+    @apply bg-clip-text border-clip-text;
   }
   .clip-image {
-    @apply bg-clip-image/20 border-clip-image;
+    @apply bg-clip-image border-clip-image;
   }
   .clip-audio {
-    @apply bg-clip-audio/20 border-clip-audio;
+    @apply bg-clip-audio border-clip-audio;
   }
 }
 
