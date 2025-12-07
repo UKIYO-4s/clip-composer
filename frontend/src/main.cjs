@@ -1,7 +1,10 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+
+// UUID v4生成（crypto.randomUUID()を使用）
+const uuidv4 = () => crypto.randomUUID();
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
@@ -153,7 +156,19 @@ class PythonBridge {
 
       // リクエスト送信
       const jsonLine = JSON.stringify(request) + '\n';
-      this.process.stdin.write(jsonLine);
+      try {
+        if (this.process && this.process.stdin && !this.process.stdin.destroyed) {
+          this.process.stdin.write(jsonLine);
+        } else {
+          pendingRequests.delete(id);
+          clearTimeout(timeout);
+          reject(new Error('Python process stdin not available'));
+        }
+      } catch (writeError) {
+        pendingRequests.delete(id);
+        clearTimeout(timeout);
+        reject(new Error('Failed to write to Python process: ' + writeError.message));
+      }
     });
   }
 
@@ -196,8 +211,12 @@ function createWindow() {
     app.quit();
   });
 
-  // Python プロセスを起動
-  pythonBridge.start();
+  // Python プロセスを起動（エラーがあってもアプリは起動する）
+  try {
+    pythonBridge.start();
+  } catch (error) {
+    console.error('Failed to start Python bridge:', error);
+  }
 }
 
 app.whenReady().then(() => {
