@@ -19,7 +19,7 @@ export const Default = {
   args: {
     children: (
       <div className="p-3">
-        <p className="text-sm text-ink-secondary">Panel content goes here.</p>
+        <p className="text-sm text-ink-secondary">パネルのコンテンツがここに入ります。</p>
       </div>
     ),
   },
@@ -27,10 +27,10 @@ export const Default = {
 
 export const WithHeader = {
   args: {
-    header: 'Panel Title',
+    header: 'パネルタイトル',
     children: (
       <div className="p-3">
-        <p className="text-sm text-ink-secondary">Panel content with a header.</p>
+        <p className="text-sm text-ink-secondary">ヘッダー付きのパネルコンテンツです。</p>
       </div>
     ),
   },
@@ -40,13 +40,13 @@ export const WithFooter = {
   args: {
     footer: (
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" size="sm">Cancel</Button>
-        <Button size="sm">Save</Button>
+        <Button variant="ghost" size="sm">キャンセル</Button>
+        <Button size="sm">保存</Button>
       </div>
     ),
     children: (
       <div className="p-3">
-        <p className="text-sm text-ink-secondary">Panel content with a footer.</p>
+        <p className="text-sm text-ink-secondary">フッター付きのパネルコンテンツです。</p>
       </div>
     ),
   },
@@ -54,22 +54,22 @@ export const WithFooter = {
 
 export const WithHeaderAndFooter = {
   args: {
-    header: 'Settings',
+    header: '設定',
     footer: (
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" size="sm">Cancel</Button>
-        <Button size="sm">Apply</Button>
+        <Button variant="ghost" size="sm">キャンセル</Button>
+        <Button size="sm">適用</Button>
       </div>
     ),
     children: (
       <div className="p-3 space-y-3">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-ink-primary">Auto-save</span>
-          <span className="text-sm text-ink-muted">Enabled</span>
+          <span className="text-sm text-ink-primary">自動保存</span>
+          <span className="text-sm text-ink-muted">有効</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-sm text-ink-primary">Quality</span>
-          <span className="text-sm text-ink-muted">High</span>
+          <span className="text-sm text-ink-primary">画質</span>
+          <span className="text-sm text-ink-muted">高</span>
         </div>
       </div>
     ),
@@ -80,13 +80,13 @@ export const CustomHeader = {
   args: {
     header: (
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-ink-primary">Custom Header</h3>
-        <Button variant="ghost" size="sm">Action</Button>
+        <h3 className="text-sm font-medium text-ink-primary">カスタムヘッダー</h3>
+        <Button variant="ghost" size="sm">アクション</Button>
       </div>
     ),
     children: (
       <div className="p-3">
-        <p className="text-sm text-ink-secondary">Panel with custom header component.</p>
+        <p className="text-sm text-ink-secondary">カスタムヘッダーコンポーネントを持つパネルです。</p>
       </div>
     ),
   },
@@ -94,24 +94,24 @@ export const CustomHeader = {
 
 export const AsPropertiesPanel = () => (
   <div className="p-4 bg-surface-base">
-    <Panel header="Properties" className="w-72">
+    <Panel header="プロパティ" className="w-72">
       <div className="p-3 space-y-4">
         <div>
-          <label className="text-xs font-medium text-ink-secondary block mb-1">Name</label>
+          <label className="text-xs font-medium text-ink-secondary block mb-1">名前</label>
           <input
             className="w-full h-8 px-2.5 rounded bg-surface-sunken border border-line text-sm text-ink-primary"
-            defaultValue="Video Clip 001"
+            defaultValue="動画クリップ 001"
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-ink-secondary block mb-1">Duration</label>
+          <label className="text-xs font-medium text-ink-secondary block mb-1">長さ</label>
           <input
             className="w-full h-8 px-2.5 rounded bg-surface-sunken border border-line text-sm text-ink-primary"
             defaultValue="00:15.30"
           />
         </div>
         <div>
-          <label className="text-xs font-medium text-ink-secondary block mb-1">Position</label>
+          <label className="text-xs font-medium text-ink-secondary block mb-1">位置</label>
           <div className="flex gap-2">
             <input
               className="flex-1 h-8 px-2.5 rounded bg-surface-sunken border border-line text-sm text-ink-primary"
@@ -133,14 +133,14 @@ export const AsPropertiesPanel = () => (
 export const AsLayerPanel = () => (
   <div className="p-4 bg-surface-base">
     <Panel
-      header="Layers"
+      header="レイヤー"
       footer={
-        <Button size="sm" className="w-full">Add Layer</Button>
+        <Button size="sm" className="w-full">レイヤーを追加</Button>
       }
       className="w-64"
     >
       <div className="divide-y divide-line">
-        {['Video Layer', 'Text Overlay', 'Audio Track'].map((layer, i) => (
+        {['動画レイヤー', 'テキストオーバーレイ', 'オーディオトラック'].map((layer, i) => (
           <div
             key={i}
             className="px-3 py-2 hover:bg-state-hover flex items-center justify-between cursor-pointer"

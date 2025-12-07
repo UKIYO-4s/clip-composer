@@ -25,34 +25,34 @@ export default {
 export const Primary = {
   args: {
     variant: 'primary',
-    children: 'Primary Button',
+    children: '保存する',
   },
 };
 
 export const Ghost = {
   args: {
     variant: 'ghost',
-    children: 'Ghost Button',
+    children: 'キャンセル',
   },
 };
 
 export const Subtle = {
   args: {
     variant: 'subtle',
-    children: 'Subtle Button',
+    children: '詳細を表示',
   },
 };
 
 export const Danger = {
   args: {
     variant: 'danger',
-    children: 'Danger Button',
+    children: '削除',
   },
 };
 
 export const AllVariants = () => (
   <div className="flex flex-col gap-4 p-4 bg-surface-base">
-    <h3 className="text-lg font-semibold text-ink-primary">Variants</h3>
+    <h3 className="text-lg font-semibold text-ink-primary">バリエーション</h3>
     <div className="flex gap-4 items-center">
       <Button variant="primary">Primary</Button>
       <Button variant="ghost">Ghost</Button>
@@ -64,18 +64,18 @@ export const AllVariants = () => (
 
 export const AllSizes = () => (
   <div className="flex flex-col gap-4 p-4 bg-surface-base">
-    <h3 className="text-lg font-semibold text-ink-primary">Sizes</h3>
+    <h3 className="text-lg font-semibold text-ink-primary">サイズ</h3>
     <div className="flex gap-4 items-center">
-      <Button size="sm">Small</Button>
-      <Button size="md">Medium</Button>
-      <Button size="lg">Large</Button>
+      <Button size="sm">小</Button>
+      <Button size="md">中</Button>
+      <Button size="lg">大</Button>
     </div>
   </div>
 );
 
 export const DisabledStates = () => (
   <div className="flex flex-col gap-4 p-4 bg-surface-base">
-    <h3 className="text-lg font-semibold text-ink-primary">Disabled States</h3>
+    <h3 className="text-lg font-semibold text-ink-primary">無効状態</h3>
     <div className="flex gap-4 items-center">
       <Button variant="primary" disabled>Primary</Button>
       <Button variant="ghost" disabled>Ghost</Button>
@@ -90,33 +90,33 @@ export const SizesByVariant = () => (
     <div>
       <h3 className="text-sm font-medium text-ink-secondary mb-3">Primary</h3>
       <div className="flex gap-4 items-center">
-        <Button variant="primary" size="sm">Small</Button>
-        <Button variant="primary" size="md">Medium</Button>
-        <Button variant="primary" size="lg">Large</Button>
+        <Button variant="primary" size="sm">小</Button>
+        <Button variant="primary" size="md">中</Button>
+        <Button variant="primary" size="lg">大</Button>
       </div>
     </div>
     <div>
       <h3 className="text-sm font-medium text-ink-secondary mb-3">Ghost</h3>
       <div className="flex gap-4 items-center">
-        <Button variant="ghost" size="sm">Small</Button>
-        <Button variant="ghost" size="md">Medium</Button>
-        <Button variant="ghost" size="lg">Large</Button>
+        <Button variant="ghost" size="sm">小</Button>
+        <Button variant="ghost" size="md">中</Button>
+        <Button variant="ghost" size="lg">大</Button>
       </div>
     </div>
     <div>
       <h3 className="text-sm font-medium text-ink-secondary mb-3">Subtle</h3>
       <div className="flex gap-4 items-center">
-        <Button variant="subtle" size="sm">Small</Button>
-        <Button variant="subtle" size="md">Medium</Button>
-        <Button variant="subtle" size="lg">Large</Button>
+        <Button variant="subtle" size="sm">小</Button>
+        <Button variant="subtle" size="md">中</Button>
+        <Button variant="subtle" size="lg">大</Button>
       </div>
     </div>
     <div>
       <h3 className="text-sm font-medium text-ink-secondary mb-3">Danger</h3>
       <div className="flex gap-4 items-center">
-        <Button variant="danger" size="sm">Small</Button>
-        <Button variant="danger" size="md">Medium</Button>
-        <Button variant="danger" size="lg">Large</Button>
+        <Button variant="danger" size="sm">小</Button>
+        <Button variant="danger" size="md">中</Button>
+        <Button variant="danger" size="lg">大</Button>
       </div>
     </div>
   </div>

@@ -17,6 +17,16 @@ const initialState = {
     quality: 'medium',
     codec: 'libx264',
   },
+  // CSV一括書き出し用
+  exportMode: 'single', // 'single' or 'batch'
+  csvPath: null,
+  batchProgress: {
+    current: 0,
+    total: 0,
+    successCount: 0,
+    errorCount: 0,
+    errors: [],
+  },
 };
 
 // 解像度プリセット
@@ -48,6 +58,20 @@ const exportSlice = createSlice({
     setExportSettings: (state, action) => {
       state.settings = { ...state.settings, ...action.payload };
     },
+    setExportMode: (state, action) => {
+      state.exportMode = action.payload;
+      state.csvPath = null;
+      state.batchProgress = {
+        current: 0,
+        total: 0,
+        successCount: 0,
+        errorCount: 0,
+        errors: [],
+      };
+    },
+    setCsvPath: (state, action) => {
+      state.csvPath = action.payload;
+    },
     startExport: (state, action) => {
       state.isExporting = true;
       state.progress = 0;
@@ -57,6 +81,21 @@ const exportSlice = createSlice({
       state.error = null;
       state.outputPath = action.payload.outputPath;
     },
+    startBatchExport: (state, action) => {
+      state.isExporting = true;
+      state.progress = 0;
+      state.currentTask = 'CSV一括書き出しを開始...';
+      state.elapsedTime = 0;
+      state.estimatedRemaining = 0;
+      state.error = null;
+      state.batchProgress = {
+        current: 0,
+        total: action.payload.total || 0,
+        successCount: 0,
+        errorCount: 0,
+        errors: [],
+      };
+    },
     updateProgress: (state, action) => {
       const { progress, message, elapsedTime, estimatedRemaining } = action.payload;
       if (progress !== undefined) state.progress = progress;
@@ -64,10 +103,34 @@ const exportSlice = createSlice({
       if (elapsedTime !== undefined) state.elapsedTime = elapsedTime;
       if (estimatedRemaining !== undefined) state.estimatedRemaining = estimatedRemaining;
     },
+    updateBatchProgress: (state, action) => {
+      const { current, total, message } = action.payload;
+      if (current !== undefined) state.batchProgress.current = current;
+      if (total !== undefined) state.batchProgress.total = total;
+      if (message !== undefined) state.currentTask = message;
+
+      // 進捗率を計算
+      if (state.batchProgress.total > 0) {
+        state.progress = (state.batchProgress.current / state.batchProgress.total) * 100;
+      }
+    },
+    addBatchError: (state, action) => {
+      state.batchProgress.errorCount += 1;
+      state.batchProgress.errors.push(action.payload);
+    },
+    incrementBatchSuccess: (state) => {
+      state.batchProgress.successCount += 1;
+    },
     exportSuccess: (state) => {
       state.isExporting = false;
       state.progress = 100;
       state.currentTask = 'Complete!';
+    },
+    batchExportComplete: (state, action) => {
+      state.isExporting = false;
+      state.progress = 100;
+      const { successCount, errorCount } = state.batchProgress;
+      state.currentTask = `完了: 成功 ${successCount}件 / 失敗 ${errorCount}件`;
     },
     exportError: (state, action) => {
       state.isExporting = false;
@@ -93,9 +156,16 @@ export const {
   openExportDialog,
   closeExportDialog,
   setExportSettings,
+  setExportMode,
+  setCsvPath,
   startExport,
+  startBatchExport,
   updateProgress,
+  updateBatchProgress,
+  addBatchError,
+  incrementBatchSuccess,
   exportSuccess,
+  batchExportComplete,
   exportError,
   cancelExport,
   resetExport,

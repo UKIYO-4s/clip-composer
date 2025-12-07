@@ -52,7 +52,7 @@ export const Default = {
 export const WithLabel = {
   render: SliderWithState,
   args: {
-    label: 'Volume',
+    label: '音量',
     value: 75,
     min: 0,
     max: 100,
@@ -62,7 +62,7 @@ export const WithLabel = {
 export const WithSuffix = {
   render: SliderWithState,
   args: {
-    label: 'Opacity',
+    label: '不透明度',
     value: 80,
     min: 0,
     max: 100,
@@ -73,7 +73,7 @@ export const WithSuffix = {
 export const WithoutValue = {
   render: SliderWithState,
   args: {
-    label: 'Brightness',
+    label: '明るさ',
     value: 50,
     min: 0,
     max: 100,
@@ -84,7 +84,7 @@ export const WithoutValue = {
 export const CustomRange = {
   render: SliderWithState,
   args: {
-    label: 'Frame Rate',
+    label: 'フレームレート',
     value: 30,
     min: 15,
     max: 60,
@@ -101,10 +101,10 @@ export const AllVariants = () => {
 
   return (
     <div className="flex flex-col gap-6 p-4 bg-surface-base w-80">
-      <h3 className="text-lg font-semibold text-ink-primary">Slider Variants</h3>
+      <h3 className="text-lg font-semibold text-ink-primary">スライダーバリエーション</h3>
 
       <Slider
-        label="Volume"
+        label="音量"
         value={volume}
         min={0}
         max={100}
@@ -113,7 +113,7 @@ export const AllVariants = () => {
       />
 
       <Slider
-        label="Opacity"
+        label="不透明度"
         value={opacity}
         min={0}
         max={100}
@@ -122,7 +122,7 @@ export const AllVariants = () => {
       />
 
       <Slider
-        label="Brightness"
+        label="明るさ"
         value={brightness}
         min={-100}
         max={100}
@@ -130,7 +130,7 @@ export const AllVariants = () => {
       />
 
       <Slider
-        label="Playback Speed"
+        label="再生速度"
         value={speed}
         min={0.25}
         max={2}
@@ -150,11 +150,11 @@ export const InPanel = () => {
   return (
     <div className="p-4 bg-surface-base">
       <div className="p-4 bg-surface-raised rounded-lg border border-line w-72">
-        <h3 className="text-sm font-medium text-ink-primary mb-4">Audio Settings</h3>
+        <h3 className="text-sm font-medium text-ink-primary mb-4">オーディオ設定</h3>
 
         <div className="space-y-4">
           <Slider
-            label="Volume"
+            label="音量"
             value={volume}
             min={0}
             max={100}
@@ -163,7 +163,7 @@ export const InPanel = () => {
           />
 
           <Slider
-            label="Pan"
+            label="パン"
             value={pan}
             min={-100}
             max={100}
@@ -171,7 +171,7 @@ export const InPanel = () => {
           />
 
           <Slider
-            label="Gain"
+            label="ゲイン"
             value={gain}
             min={-12}
             max={12}

@@ -184,5 +184,67 @@ def handle_cancel(params: dict, handler: IPCHandler):
     return {"message": "Cancel requested"}
 
 
+@register_handler("render_batch")
+def handle_render_batch(params: dict, handler: IPCHandler):
+    """CSV一括動画レンダリング"""
+    csv_path = params.get("csvPath")
+    timeline_data = params.get("timelineData")
+    output_dir = params.get("outputDir")
+    options = params.get("options", {})
+
+    if not csv_path:
+        raise ValueError("csvPath is required")
+    if not timeline_data:
+        raise ValueError("timelineData is required")
+    if not output_dir:
+        raise ValueError("outputDir is required")
+
+    # CSVハンドラーで一括処理
+    from modules.csv_handler import CSVHandler
+
+    csv_handler = CSVHandler()
+
+    # CSVファイルを読み込み
+    if not csv_handler.load_csv(csv_path):
+        raise ValueError("Failed to load CSV file")
+
+    # 全体進捗コールバック
+    def progress_callback(current: int, total: int, message: str):
+        percentage = (current / total * 100) if total > 0 else 0
+        handler.send_progress(percentage, message, {
+            'current': current,
+            'total': total
+        })
+
+    # 行単位コールバック（各動画の成功/失敗を通知）
+    def row_callback(row_number: int, row_data: dict, success: bool, error_message: str):
+        video_name = row_data.get('動画名', f'Row{row_number}')
+        status = 'success' if success else 'error'
+
+        # 個別の行結果を進捗として送信
+        handler.send_progress(
+            -1,  # 特殊な値: 行単位の結果
+            f"{video_name}: {status}",
+            {
+                'type': 'row_result',
+                'row_number': row_number,
+                'video_name': video_name,
+                'success': success,
+                'error': error_message
+            }
+        )
+
+    # バッチ処理実行
+    result = csv_handler.process_batch(
+        timeline_data=timeline_data,
+        output_dir=output_dir,
+        options=options,
+        progress_callback=progress_callback,
+        row_callback=row_callback
+    )
+
+    return result
+
+
 if __name__ == "__main__":
     ipc.run()

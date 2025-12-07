@@ -25,6 +25,30 @@ except ImportError:
     MOVIEPY_AVAILABLE = False
     print("Warning: MoviePy not available. Video rendering will not work.")
 
+# ランダムレイヤーモジュールのインポート
+try:
+    from .random_layer import get_handler as get_random_handler
+    RANDOM_LAYER_AVAILABLE = True
+except ImportError:
+    RANDOM_LAYER_AVAILABLE = False
+    print("Warning: RandomLayerHandler not available.")
+
+# 可変テキストモジュールのインポート
+try:
+    from .variable_text import get_handler as get_variable_text_handler
+    VARIABLE_TEXT_AVAILABLE = True
+except ImportError:
+    VARIABLE_TEXT_AVAILABLE = False
+    print("Warning: VariableTextHandler not available.")
+
+# 調整レイヤーモジュールのインポート
+try:
+    from .adjustment_layer import get_handler as get_adjustment_handler
+    ADJUSTMENT_LAYER_AVAILABLE = True
+except ImportError:
+    ADJUSTMENT_LAYER_AVAILABLE = False
+    print("Warning: AdjustmentLayerHandler not available.")
+
 
 class VideoProcessor:
     """動画処理を行うメインクラス"""
@@ -170,7 +194,7 @@ class VideoProcessor:
                     if self._cancel_flag:
                         raise Exception("レンダリングがキャンセルされました")
 
-                    clip = self._create_audio_clip(clip_data)
+                    clip = self._create_audio_clip(clip_data, fps=fps, video_duration=duration)
                     if clip:
                         audio_clips.append(clip)
 
@@ -311,14 +335,82 @@ class VideoProcessor:
 
             elif clip_type == 'text':
                 # PIL/Pillowでテキスト画像を生成
-                text = clip_data.get('text', 'Sample Text')
+                text = clip_data.get('textContent', 'Sample Text')
                 font_size = clip_data.get('fontSize', 48)
-                color = clip_data.get('color', 'white')
+                text_color = clip_data.get('textColor', '#ffffff')
+                bg_color = clip_data.get('bgColor', '#000000')
                 resolution = clip_data.get('resolution', (1920, 1080))
 
                 # テキスト画像の生成
-                text_image = self._create_text_image(text, font_size, color, resolution)
+                text_image = self._create_text_image(text, font_size, text_color, bg_color, resolution)
                 clip = ImageClip(text_image, duration=duration)
+
+                # アニメーションの適用
+                animation = clip_data.get('animation')
+                if animation and animation.get('type') != 'none':
+                    clip = self._apply_text_animation(clip, animation, fps)
+
+            elif clip_type == 'random_layer':
+                # ランダムレイヤー: フォルダから動画をランダム選択
+                if RANDOM_LAYER_AVAILABLE:
+                    handler = get_random_handler()
+                    selected_file = handler.select_video(clip_data)
+
+                    if selected_file and os.path.exists(selected_file):
+                        video_clip = VideoFileClip(selected_file)
+
+                        # 動画の長さがクリップより短い場合はループ
+                        if video_clip.duration < duration:
+                            # ループ回数を計算
+                            num_loops = int(math.ceil(duration / video_clip.duration))
+                            clips_to_concat = [video_clip] * num_loops
+                            video_clip = concatenate_videoclips(clips_to_concat)
+
+                        clip = video_clip.subclip(0, min(duration, video_clip.duration))
+                        clip = clip.set_duration(duration)
+                    else:
+                        print(f"警告: ランダムレイヤーのファイルが見つかりません: {selected_file}")
+                else:
+                    print("警告: RandomLayerHandlerが利用できません")
+
+            elif clip_type == 'variable_text':
+                # 可変テキスト: CSVからテキストを取得して表示
+                if VARIABLE_TEXT_AVAILABLE:
+                    handler = get_variable_text_handler()
+                    text = handler.get_text_from_clip(clip_data)
+
+                    if text is None:
+                        text = clip_data.get('textContent', 'Variable Text')
+
+                    font_size = clip_data.get('fontSize', 48)
+                    text_color = clip_data.get('textColor', '#ffffff')
+                    bg_color = clip_data.get('bgColor', '#000000')
+                    resolution = clip_data.get('resolution', (1920, 1080))
+
+                    # テキスト画像の生成
+                    text_image = self._create_text_image(text, font_size, text_color, bg_color, resolution)
+                    clip = ImageClip(text_image, duration=duration)
+
+                    # アニメーションの適用
+                    animation = clip_data.get('animation')
+                    if animation and animation.get('type') != 'none':
+                        clip = self._apply_text_animation(clip, animation, fps)
+                else:
+                    print("警告: VariableTextHandlerが利用できません")
+
+            elif clip_type == 'adjustment':
+                # 調整レイヤー: エフェクトを適用（透明クリップとして作成）
+                if ADJUSTMENT_LAYER_AVAILABLE:
+                    handler = get_adjustment_handler()
+                    resolution = clip_data.get('resolution', (1920, 1080))
+
+                    # 調整レイヤーは透明なクリップとして作成
+                    clip = handler.create_adjustment_layer(clip_data, duration, resolution)
+
+                    # 注意: 実際のエフェクト適用はCompositeVideoClip時に
+                    # 下のレイヤーに対して行う必要がある（別途実装）
+                else:
+                    print("警告: AdjustmentLayerHandlerが利用できません")
 
             # プロパティの適用
             if clip:
@@ -330,12 +422,14 @@ class VideoProcessor:
             print(f"ビデオクリップ作成エラー: {e}")
             return None
 
-    def _create_audio_clip(self, clip_data: Dict[str, Any]):
+    def _create_audio_clip(self, clip_data: Dict[str, Any], fps: float = 30, video_duration: float = None):
         """
         オーディオクリップを作成
 
         Args:
             clip_data: クリップデータ
+            fps: フレームレート
+            video_duration: 動画の総尺（ループ用）
 
         Returns:
             MoviePy audio clip object or None
@@ -354,23 +448,58 @@ class VideoProcessor:
             if in_point > 0 or out_point < audio_clip.duration:
                 audio_clip = audio_clip.subclip(in_point, min(out_point, audio_clip.duration))
 
+            # ループ処理（BGMのみ）
+            clip_type = clip_data.get('type')
+            loop_enabled = clip_data.get('loop', False)
+
+            if clip_type == 'bgm' and loop_enabled and video_duration:
+                # クリップの開始時間と期待される長さを計算
+                start_frame = clip_data.get('startFrame', 0)
+                start_time = start_frame / fps
+                required_duration = video_duration - start_time
+
+                # オーディオが必要な長さより短い場合はループ
+                if audio_clip.duration < required_duration:
+                    # ループ回数を計算
+                    num_loops = int(math.ceil(required_duration / audio_clip.duration))
+
+                    # 複数回繰り返してから必要な長さにカット
+                    from moviepy.audio.fx import audio_loop
+                    audio_clip = audio_loop.audio_loop(audio_clip, n=num_loops)
+                    audio_clip = audio_clip.set_duration(required_duration)
+
             # 開始時間の設定
-            start_time = clip_data.get('startFrame', 0) / clip_data.get('fps', 30)
+            start_time = clip_data.get('startFrame', 0) / fps
             audio_clip = audio_clip.set_start(start_time)
 
-            # ボリューム調整
-            volume = clip_data.get('volume', 1.0)
+            # ボリューム調整（パーセンテージ → 倍率変換）
+            volume = clip_data.get('volume', 100) / 100.0
             if volume != 1.0:
                 audio_clip = audio_clip.volumex(volume)
 
-            # フェードイン/アウト
-            fade_in = clip_data.get('fadeIn', 0)
-            fade_out = clip_data.get('fadeOut', 0)
+            # フェードイン/アウト（新フォーマット対応）
+            fade_in_data = clip_data.get('fade_in', {})
+            fade_out_data = clip_data.get('fade_out', {})
 
-            if fade_in > 0:
-                audio_clip = audio_clip.audio_fadein(fade_in)
-            if fade_out > 0:
-                audio_clip = audio_clip.audio_fadeout(fade_out)
+            # 新フォーマット（fade_in/fade_out オブジェクト）
+            if isinstance(fade_in_data, dict) and fade_in_data.get('enabled', False):
+                fade_in_duration = fade_in_data.get('duration_sec', 0)
+                if fade_in_duration > 0:
+                    audio_clip = audio_clip.audio_fadein(fade_in_duration)
+
+            if isinstance(fade_out_data, dict) and fade_out_data.get('enabled', False):
+                fade_out_duration = fade_out_data.get('duration_sec', 0)
+                if fade_out_duration > 0:
+                    audio_clip = audio_clip.audio_fadeout(fade_out_duration)
+
+            # 旧フォーマット（fadeIn/fadeOut 数値）の後方互換性
+            fade_in_legacy = clip_data.get('fadeIn', 0)
+            fade_out_legacy = clip_data.get('fadeOut', 0)
+
+            if not isinstance(fade_in_data, dict) and fade_in_legacy > 0:
+                audio_clip = audio_clip.audio_fadein(fade_in_legacy)
+            if not isinstance(fade_out_data, dict) and fade_out_legacy > 0:
+                audio_clip = audio_clip.audio_fadeout(fade_out_legacy)
 
             return audio_clip
 
@@ -419,7 +548,8 @@ class VideoProcessor:
         self,
         text: str,
         font_size: int,
-        color: str,
+        text_color: str,
+        bg_color: str,
         resolution: tuple
     ) -> np.ndarray:
         """
@@ -428,14 +558,18 @@ class VideoProcessor:
         Args:
             text: テキスト
             font_size: フォントサイズ
-            color: テキストカラー
+            text_color: テキストカラー（hex形式）
+            bg_color: 背景カラー（hex形式）
             resolution: 解像度
 
         Returns:
-            numpy array (RGB)
+            numpy array (RGBA)
         """
+        # 背景色をRGBAに変換
+        bg_rgba = self._hex_to_rgba(bg_color, alpha=0)  # 透明背景
+
         # 画像の作成
-        img = Image.new('RGBA', resolution, (0, 0, 0, 0))
+        img = Image.new('RGBA', resolution, bg_rgba)
         draw = ImageDraw.Draw(img)
 
         # フォントの読み込み（システムフォントを使用）
@@ -459,21 +593,82 @@ class VideoProcessor:
         x = (resolution[0] - text_width) // 2
         y = (resolution[1] - text_height) // 2
 
-        # カラー変換
-        color_map = {
-            'white': (255, 255, 255),
-            'black': (0, 0, 0),
-            'red': (255, 0, 0),
-            'green': (0, 255, 0),
-            'blue': (0, 0, 255),
-        }
-        rgb_color = color_map.get(color.lower(), (255, 255, 255))
+        # テキストカラーをRGBAに変換
+        text_rgba = self._hex_to_rgba(text_color, alpha=255)
 
         # テキストを描画
-        draw.text((x, y), text, font=font, fill=rgb_color)
+        draw.text((x, y), text, font=font, fill=text_rgba)
 
         # numpy配列に変換
         return np.array(img)
+
+    def _hex_to_rgba(self, hex_color: str, alpha: int = 255) -> tuple:
+        """
+        HEXカラーコードをRGBAタプルに変換
+
+        Args:
+            hex_color: HEXカラーコード（例: '#ffffff'）
+            alpha: アルファ値（0-255）
+
+        Returns:
+            (R, G, B, A) タプル
+        """
+        # '#'を削除
+        hex_color = hex_color.lstrip('#')
+
+        # RGBに変換
+        if len(hex_color) == 6:
+            r = int(hex_color[0:2], 16)
+            g = int(hex_color[2:4], 16)
+            b = int(hex_color[4:6], 16)
+        else:
+            # デフォルトは白
+            r, g, b = 255, 255, 255
+
+        return (r, g, b, alpha)
+
+    def _apply_text_animation(self, clip, animation: Dict[str, Any], fps: float):
+        """
+        テキストクリップにアニメーションを適用
+
+        Args:
+            clip: MoviePy clip object
+            animation: アニメーション設定 {"type": "fade_in"|"slide_in", "duration_frames": int}
+            fps: フレームレート
+
+        Returns:
+            Modified clip object
+        """
+        animation_type = animation.get('type', 'none')
+        duration_frames = animation.get('duration_frames', 15)
+        animation_duration = duration_frames / fps
+
+        if animation_type == 'fade_in':
+            # フェードインアニメーション
+            def opacity_func(t):
+                if t < animation_duration:
+                    return t / animation_duration
+                return 1.0
+
+            clip = clip.set_opacity(opacity_func)
+
+        elif animation_type == 'slide_in':
+            # スライドインアニメーション（下から上へ）
+            original_pos = clip.pos if hasattr(clip, 'pos') and clip.pos else (0, 0)
+
+            def position_func(t):
+                if t < animation_duration:
+                    # アニメーション中: 下から上へスライド
+                    progress = t / animation_duration
+                    # イージング関数（ease-out）
+                    eased_progress = 1 - (1 - progress) ** 2
+                    offset_y = 100 * (1 - eased_progress)  # 下から100px上へ
+                    return (original_pos[0], original_pos[1] + offset_y)
+                return original_pos
+
+            clip = clip.set_position(position_func)
+
+        return clip
 
     def cancel(self):
         """レンダリングを中断"""

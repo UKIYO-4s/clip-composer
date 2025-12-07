@@ -5,7 +5,9 @@ contextBridge.exposeInMainWorld('api', {
 
   // File operations
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  selectDirectory: (options) => ipcRenderer.invoke('select-directory', options),
   selectFiles: (options) => ipcRenderer.invoke('select-files', options),
+  openFile: (options) => ipcRenderer.invoke('open-file', options),
   loadCSV: (path) => ipcRenderer.invoke('load-csv', path),
 
   // Python Backend IPC
@@ -23,6 +25,12 @@ contextBridge.exposeInMainWorld('api', {
     render: (timelineData, outputPath, options = {}) => ipcRenderer.invoke('python-invoke', {
       command: 'render',
       params: { timelineData, outputPath, options }
+    }),
+
+    // CSV一括レンダリング開始
+    renderBatch: (timelineData, csvPath, outputDir, options = {}) => ipcRenderer.invoke('python-invoke', {
+      command: 'render_batch',
+      params: { timelineData, csvPath, outputDir, options }
     }),
 
     // レンダリングキャンセル

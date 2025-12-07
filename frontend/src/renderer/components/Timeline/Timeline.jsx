@@ -1,8 +1,9 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setCurrentFrame, addClip } from '../../store/timelineSlice';
+import { setCurrentFrame, addClip, clearSelection } from '../../store/timelineSlice';
 import Layer from './Layer';
 import TransportControls from '../Controls/TransportControls';
+import MarqueeSelection from './MarqueeSelection';
 
 // ファイル拡張子からクリップタイプを判定
 const getClipTypeFromFile = (fileName) => {
@@ -39,7 +40,33 @@ function Timeline() {
   } = useSelector((state) => state.timeline);
 
   const timelineRef = useRef(null);
+  const rulerRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
+
+  // レイヤー表示順序をソート
+  // Video: 番号が大きいほど上（V3, V2, V1）
+  // Sound: 番号が小さいほど上（S1, S2, S3）
+  const sortedLayerOrder = useMemo(() => {
+    const videoLayers = layerOrder.filter(id => id.startsWith('V'));
+    const soundLayers = layerOrder.filter(id => id.startsWith('S'));
+
+    // Video: 降順ソート（番号が大きいものが先）
+    videoLayers.sort((a, b) => {
+      const numA = parseInt(a.slice(1)) || 0;
+      const numB = parseInt(b.slice(1)) || 0;
+      return numB - numA;
+    });
+
+    // Sound: 昇順ソート（番号が小さいものが先）
+    soundLayers.sort((a, b) => {
+      const numA = parseInt(a.slice(1)) || 0;
+      const numB = parseInt(b.slice(1)) || 0;
+      return numA - numB;
+    });
+
+    return [...videoLayers, ...soundLayers];
+  }, [layerOrder]);
 
   // 外部ファイルドロップハンドラー
   const handleDragOver = useCallback((e) => {
@@ -103,15 +130,54 @@ function Timeline() {
       .padStart(2, '0')}`;
   };
 
-  // タイムラインクリックで再生ヘッド移動
-  const handleTimelineClick = (e) => {
-    if (!timelineRef.current) return;
-    const rect = timelineRef.current.getBoundingClientRect();
-    const scrollLeft = timelineRef.current.scrollLeft;
-    const x = e.clientX - rect.left + scrollLeft - 80; // 80px はラベルエリア
+  // 再生位置更新（ルーラー専用）
+  const updatePlayheadPosition = useCallback((e) => {
+    if (!rulerRef.current || !timelineRef.current) return;
+    const rect = rulerRef.current.getBoundingClientRect();
+    const scrollLeft = timelineRef.current.scrollLeft || 0;
+    const x = e.clientX - rect.left + scrollLeft;
     const frame = Math.max(0, Math.min(Math.floor(x / pixelsPerFrame), totalFrames));
     dispatch(setCurrentFrame(frame));
-  };
+  }, [dispatch, pixelsPerFrame, totalFrames]);
+
+  // ルーラーのマウスダウン
+  const handleRulerMouseDown = useCallback((e) => {
+    e.stopPropagation();
+    setIsDraggingPlayhead(true);
+    updatePlayheadPosition(e);
+  }, [updatePlayheadPosition]);
+
+  // マウス移動（requestAnimationFrameでスロットリング）
+  const handlePlayheadDrag = useCallback((e) => {
+    if (!isDraggingPlayhead) return;
+    requestAnimationFrame(() => {
+      updatePlayheadPosition(e);
+    });
+  }, [isDraggingPlayhead, updatePlayheadPosition]);
+
+  // マウスアップ
+  const handlePlayheadDragEnd = useCallback(() => {
+    setIsDraggingPlayhead(false);
+  }, []);
+
+  // グローバルイベント（クリーンアップ必須）
+  useEffect(() => {
+    if (isDraggingPlayhead) {
+      window.addEventListener('mousemove', handlePlayheadDrag);
+      window.addEventListener('mouseup', handlePlayheadDragEnd);
+      return () => {
+        window.removeEventListener('mousemove', handlePlayheadDrag);
+        window.removeEventListener('mouseup', handlePlayheadDragEnd);
+      };
+    }
+  }, [isDraggingPlayhead, handlePlayheadDrag, handlePlayheadDragEnd]);
+
+  // 背景クリックで選択解除
+  const handleBackgroundClick = useCallback((e) => {
+    // クリップやルーラー上のクリックは無視
+    if (e.target.closest('[data-clip]') || e.target.closest('[data-ruler]')) return;
+    dispatch(clearSelection());
+  }, [dispatch]);
 
   // タイムルーラーの描画
   const renderTimeRuler = () => {
@@ -171,7 +237,7 @@ function Timeline() {
           {/* タイムルーラー用スペース */}
           <div className="h-6 border-b border-line" />
           {/* レイヤー名 */}
-          {layerOrder.map((layerId) => (
+          {sortedLayerOrder.map((layerId) => (
             <div
               key={layerId}
               className="h-12 flex items-center px-2 border-b border-line hover:bg-state-hover"
@@ -187,19 +253,24 @@ function Timeline() {
         <div
           ref={timelineRef}
           className="flex-1 overflow-x-auto overflow-y-hidden"
-          onClick={handleTimelineClick}
+          onClick={handleBackgroundClick}
         >
           <div
             className="relative"
             style={{ width: `${timelineWidth}px`, minWidth: '100%' }}
           >
-            {/* タイムルーラー */}
-            <div className="h-6 relative bg-surface-sunken border-b border-line">
+            {/* タイムルーラー（再生バー操作可能エリア） */}
+            <div
+              ref={rulerRef}
+              data-ruler="true"
+              className="h-6 relative bg-surface-sunken border-b border-line cursor-pointer"
+              onMouseDown={handleRulerMouseDown}
+            >
               {renderTimeRuler()}
             </div>
 
             {/* レイヤー */}
-            {layerOrder.map((layerId) => (
+            {sortedLayerOrder.map((layerId) => (
               <Layer
                 key={layerId}
                 layerId={layerId}
@@ -207,6 +278,14 @@ function Timeline() {
                 pixelsPerFrame={pixelsPerFrame}
               />
             ))}
+
+            {/* マーキー選択 */}
+            <MarqueeSelection
+              timelineRef={timelineRef}
+              layers={layers}
+              layerOrder={sortedLayerOrder}
+              pixelsPerFrame={pixelsPerFrame}
+            />
 
             {/* 再生ヘッド */}
             <div

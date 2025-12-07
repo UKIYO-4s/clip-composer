@@ -9,23 +9,28 @@ export {
   SkipForward,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Repeat,
 
   // File
   File,
   FolderOpen,
+  Folder,
   Save,
   FilePlus,
   Clock,
 
   // Asset
   Plus,
+  Minus,
   Search,
   X,
   Film,
   Image,
   Music,
   Trash2,
+  Maximize,
 
   // Property
   ChevronDown,
@@ -37,6 +42,11 @@ export {
   RotateCw,
   Layers,
   Maximize2,
+  Shuffle,
+  Sliders,
+  Sparkles,
+  Braces,
+  Video,
 
   // Export
   Download,
@@ -58,4 +68,10 @@ export {
   MoreVertical,
   ArrowLeft,
   ArrowRight,
+
+  // Help
+  HelpCircle,
+
+  // Random Layer Management
+  RotateCcw,
 } from 'lucide-react';

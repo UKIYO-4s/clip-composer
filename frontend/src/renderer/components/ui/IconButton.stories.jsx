@@ -39,7 +39,7 @@ export const Subtle = {
 
 export const AllVariants = () => (
   <div className="flex flex-col gap-4 p-4 bg-surface-base">
-    <h3 className="text-lg font-semibold text-ink-primary">Variants</h3>
+    <h3 className="text-lg font-semibold text-ink-primary">バリエーション</h3>
     <div className="flex gap-4 items-center">
       <IconButton variant="ghost"><Play size={16} /></IconButton>
       <IconButton variant="subtle"><Play size={16} /></IconButton>
@@ -49,7 +49,7 @@ export const AllVariants = () => (
 
 export const AllSizes = () => (
   <div className="flex flex-col gap-4 p-4 bg-surface-base">
-    <h3 className="text-lg font-semibold text-ink-primary">Sizes</h3>
+    <h3 className="text-lg font-semibold text-ink-primary">サイズ</h3>
     <div className="flex gap-4 items-center">
       <IconButton size="sm"><Play size={14} /></IconButton>
       <IconButton size="md"><Play size={16} /></IconButton>
@@ -60,7 +60,7 @@ export const AllSizes = () => (
 
 export const WithDifferentIcons = () => (
   <div className="flex flex-col gap-4 p-4 bg-surface-base">
-    <h3 className="text-lg font-semibold text-ink-primary">Common Icons</h3>
+    <h3 className="text-lg font-semibold text-ink-primary">よく使うアイコン</h3>
     <div className="flex gap-4 items-center">
       <IconButton><Play size={16} /></IconButton>
       <IconButton><Pause size={16} /></IconButton>
@@ -74,7 +74,7 @@ export const WithDifferentIcons = () => (
 
 export const DisabledStates = () => (
   <div className="flex flex-col gap-4 p-4 bg-surface-base">
-    <h3 className="text-lg font-semibold text-ink-primary">Disabled States</h3>
+    <h3 className="text-lg font-semibold text-ink-primary">無効状態</h3>
     <div className="flex gap-4 items-center">
       <IconButton variant="ghost" disabled><Play size={16} /></IconButton>
       <IconButton variant="subtle" disabled><Play size={16} /></IconButton>

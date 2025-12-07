@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   setCurrentFrame,
   setIsPlaying,
   setLoopEnabled,
+  selectLayers,
 } from '../../store/timelineSlice';
 import {
   Play,
@@ -12,6 +13,8 @@ import {
   SkipForward,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Repeat,
 } from '../Icons';
 
@@ -24,9 +27,24 @@ function TransportControls() {
     isPlaying,
     loopEnabled,
   } = useSelector((state) => state.timeline);
+  const layers = useSelector(selectLayers);
 
   const animationFrameId = useRef(null);
   const lastFrameTime = useRef(null);
+
+  // 全クリップの境界点（開始位置・終了位置）を収集
+  const clipBoundaries = useMemo(() => {
+    const boundaries = new Set([0]); // 0フレームは常に含める
+
+    Object.values(layers).forEach((layer) => {
+      layer.clips.forEach((clip) => {
+        boundaries.add(clip.startFrame);
+        boundaries.add(clip.startFrame + clip.durationFrames);
+      });
+    });
+
+    return [...boundaries].sort((a, b) => a - b);
+  }, [layers]);
 
   // 再生ロジック: 30fps で currentFrame を自動更新
   const animate = useCallback(() => {
@@ -114,6 +132,30 @@ function TransportControls() {
     dispatch(setLoopEnabled(!loopEnabled));
   };
 
+  // 前のクリップ境界へジャンプ
+  const handlePreviousClip = () => {
+    // 現在位置より前の境界点を探す（少し余裕を持たせて判定）
+    const prev = clipBoundaries.filter((frame) => frame < currentFrame - 1).pop();
+    if (prev !== undefined) {
+      dispatch(setCurrentFrame(prev));
+    } else {
+      // 見つからない場合は先頭へ
+      dispatch(setCurrentFrame(0));
+    }
+  };
+
+  // 次のクリップ境界へジャンプ
+  const handleNextClip = () => {
+    // 現在位置より後の境界点を探す（少し余裕を持たせて判定）
+    const next = clipBoundaries.find((frame) => frame > currentFrame + 1);
+    if (next !== undefined) {
+      dispatch(setCurrentFrame(next));
+    } else {
+      // 見つからない場合は末尾へ
+      dispatch(setCurrentFrame(totalFrames - 1));
+    }
+  };
+
   return (
     <div className="flex items-center gap-2 bg-surface-raised px-4 py-2 border-b border-line">
       {/* 先頭へ移動 */}
@@ -123,6 +165,15 @@ function TransportControls() {
         title="先頭へ移動 (Home)"
       >
         <SkipBack className="w-4 h-4" />
+      </button>
+
+      {/* 前のクリップへ */}
+      <button
+        onClick={handlePreviousClip}
+        className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
+        title="前のクリップへ"
+      >
+        <ChevronsLeft className="w-5 h-5" />
       </button>
 
       {/* 1フレーム戻る */}
@@ -154,6 +205,15 @@ function TransportControls() {
         title="次のフレーム (→)"
       >
         <ChevronRight className="w-5 h-5" />
+      </button>
+
+      {/* 次のクリップへ */}
+      <button
+        onClick={handleNextClip}
+        className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
+        title="次のクリップへ"
+      >
+        <ChevronsRight className="w-5 h-5" />
       </button>
 
       {/* 末尾へ移動 */}

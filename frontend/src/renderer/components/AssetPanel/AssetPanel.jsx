@@ -14,6 +14,7 @@ import {
 } from '../../store/assetsSlice';
 import { Film, Image, Music, File, X, Plus, FolderOpen } from '../Icons';
 import { Button, IconButton, Input } from '../ui';
+import LayerCreationPanel from '../LayerCreation/LayerCreationPanel';
 
 // ドラッグ用アイテムタイプ
 export const AssetItemTypes = {
@@ -180,79 +181,85 @@ function AssetPanel() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* ヘッダー */}
-      <div className="p-3 border-b border-line">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-ink-secondary">アセット</h2>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleImportClick}
-          >
-            <Plus className="w-3 h-3" />
-            インポート
-          </Button>
-        </div>
+      {/* 新規レイヤー作成パネル */}
+      <LayerCreationPanel />
 
-        {/* 検索 */}
-        <Input
-          type="text"
-          placeholder="検索..."
-          value={searchQuery}
-          onChange={(e) => dispatch(setSearchQuery(e.target.value))}
-          className="w-full"
-        />
+      {/* アセット管理セクション */}
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* ヘッダー */}
+        <div className="p-3 border-b border-line">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-semibold text-ink-secondary">素材ライブラリ</h2>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleImportClick}
+            >
+              <Plus className="w-3 h-3" />
+              インポート
+            </Button>
+          </div>
 
-        {/* フィルター */}
-        <div className="flex gap-1 mt-2">
-          {filterButtons.map((btn) => {
-            const isActive = filter === btn.value;
-            if (btn.icon) {
+          {/* 検索 */}
+          <Input
+            type="text"
+            placeholder="検索..."
+            value={searchQuery}
+            onChange={(e) => dispatch(setSearchQuery(e.target.value))}
+            className="w-full"
+          />
+
+          {/* フィルター */}
+          <div className="flex gap-1 mt-2">
+            {filterButtons.map((btn) => {
+              const isActive = filter === btn.value;
+              if (btn.icon) {
+                return (
+                  <IconButton
+                    key={btn.value}
+                    variant={isActive ? 'subtle' : 'ghost'}
+                    size="sm"
+                    className={isActive ? 'bg-accent-blue text-white hover:bg-accent-blue' : ''}
+                    onClick={() => dispatch(setFilter(btn.value))}
+                  >
+                    <btn.icon className="w-4 h-4" />
+                  </IconButton>
+                );
+              }
               return (
-                <IconButton
+                <Button
                   key={btn.value}
-                  variant={isActive ? 'subtle' : 'ghost'}
+                  variant={isActive ? 'primary' : 'subtle'}
                   size="sm"
-                  className={isActive ? 'bg-accent-blue text-white hover:bg-accent-blue' : ''}
                   onClick={() => dispatch(setFilter(btn.value))}
                 >
-                  <btn.icon className="w-4 h-4" />
-                </IconButton>
+                  {btn.label}
+                </Button>
               );
-            }
-            return (
-              <Button
-                key={btn.value}
-                variant={isActive ? 'primary' : 'subtle'}
-                size="sm"
-                onClick={() => dispatch(setFilter(btn.value))}
-              >
-                {btn.label}
-              </Button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* アセットリスト */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {assets.length === 0 ? (
-          <div className="text-center py-8 text-ink-muted text-sm">
-            <FolderOpen className="w-8 h-8 mx-auto mb-2" />
-            <div>ファイルをドロップ</div>
-            <div>または インポート ボタン</div>
+            })}
           </div>
-        ) : (
-          assets.map((asset) => (
-            <AssetItem
-              key={asset.id}
-              asset={asset}
-              isSelected={asset.id === selectedAssetId}
-              onSelect={handleSelect}
-              onRemove={handleRemove}
-            />
-          ))
-        )}
+        </div>
+
+        {/* アセットリスト */}
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {assets.length === 0 ? (
+            <div className="text-center py-8 text-ink-muted text-sm">
+              <FolderOpen className="w-8 h-8 mx-auto mb-2" />
+              <div>ファイルをドロップ</div>
+              <div>または インポート ボタン</div>
+            </div>
+          ) : (
+            assets.map((asset) => (
+              <AssetItem
+                key={asset.id}
+                asset={asset}
+                isSelected={asset.id === selectedAssetId}
+                onSelect={handleSelect}
+                onRemove={handleRemove}
+              />
+            ))
+          )}
+        </div>
       </div>
 
       {/* ドラッグオーバーレイ */}

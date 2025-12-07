@@ -33,10 +33,10 @@ const ColorGroup = ({ title, colors }) => (
 
 export const AllColors = () => (
   <div className="p-6 bg-surface-base min-h-screen">
-    <h1 className="text-2xl font-bold text-ink-primary mb-8">Color Palette</h1>
+    <h1 className="text-2xl font-bold text-ink-primary mb-8">カラーパレット</h1>
 
     <ColorGroup
-      title="Surface"
+      title="Surface（背景）"
       colors={[
         { name: 'base', value: '#0d0f14' },
         { name: 'sunken', value: '#0b0d11' },
@@ -46,7 +46,7 @@ export const AllColors = () => (
     />
 
     <ColorGroup
-      title="Ink"
+      title="Ink（テキスト）"
       colors={[
         { name: 'primary', value: '#e7ecf4' },
         { name: 'secondary', value: '#9aa3b8' },
@@ -56,7 +56,7 @@ export const AllColors = () => (
     />
 
     <ColorGroup
-      title="Line"
+      title="Line（ボーダー）"
       colors={[
         { name: 'subtle', value: '#1d2230' },
         { name: 'default', value: '#252b3a' },
@@ -65,7 +65,7 @@ export const AllColors = () => (
     />
 
     <ColorGroup
-      title="Accent"
+      title="Accent（アクセント）"
       colors={[
         { name: 'blue', value: '#2aa6ff' },
         { name: 'cyan', value: '#3ccfda' },
@@ -77,14 +77,14 @@ export const AllColors = () => (
     />
 
     <ColorGroup
-      title="Track Types"
+      title="Track（トラックタイプ）"
       colors={[
-        { name: 'video', value: '#1d7fcc' },
-        { name: 'text', value: '#d4952a' },
-        { name: 'image', value: '#2ba88a' },
-        { name: 'audio', value: '#3d5fb8' },
-        { name: 'se', value: '#2e8da8' },
-        { name: 'adjust', value: '#9b4fd6' },
+        { name: 'video（動画）', value: '#1d7fcc' },
+        { name: 'text（テキスト）', value: '#d4952a' },
+        { name: 'image（画像）', value: '#2ba88a' },
+        { name: 'audio（BGM）', value: '#3d5fb8' },
+        { name: 'se（効果音）', value: '#2e8da8' },
+        { name: 'adjust（調整）', value: '#9b4fd6' },
       ]}
     />
   </div>
@@ -92,19 +92,19 @@ export const AllColors = () => (
 
 export const SurfaceColors = () => (
   <div className="p-6 bg-surface-base">
-    <h2 className="text-xl font-bold text-ink-primary mb-6">Surface Colors</h2>
+    <h2 className="text-xl font-bold text-ink-primary mb-6">背景カラー</h2>
     <div className="space-y-4">
       <div className="p-4 bg-surface-base border border-line rounded">
-        <span className="text-ink-primary">surface-base: #0d0f14</span>
+        <span className="text-ink-primary">surface-base: #0d0f14（ベース）</span>
       </div>
       <div className="p-4 bg-surface-sunken border border-line rounded">
-        <span className="text-ink-primary">surface-sunken: #0b0d11</span>
+        <span className="text-ink-primary">surface-sunken: #0b0d11（沈み込み）</span>
       </div>
       <div className="p-4 bg-surface-raised border border-line rounded">
-        <span className="text-ink-primary">surface-raised: #11141d</span>
+        <span className="text-ink-primary">surface-raised: #11141d（浮き上がり）</span>
       </div>
       <div className="p-4 bg-surface-highest border border-line rounded">
-        <span className="text-ink-primary">surface-highest: #161a24</span>
+        <span className="text-ink-primary">surface-highest: #161a24（最上位）</span>
       </div>
     </div>
   </div>
@@ -112,19 +112,19 @@ export const SurfaceColors = () => (
 
 export const InkColors = () => (
   <div className="p-6 bg-surface-base">
-    <h2 className="text-xl font-bold text-ink-primary mb-6">Ink (Text) Colors</h2>
+    <h2 className="text-xl font-bold text-ink-primary mb-6">テキストカラー</h2>
     <div className="space-y-4 bg-surface-raised p-4 rounded border border-line">
-      <p className="text-ink-primary">ink-primary: #e7ecf4 - Main text</p>
-      <p className="text-ink-secondary">ink-secondary: #9aa3b8 - Secondary text</p>
-      <p className="text-ink-muted">ink-muted: #6b7387 - Muted text</p>
-      <p className="text-ink-disabled">ink-disabled: #4b5161 - Disabled text</p>
+      <p className="text-ink-primary">ink-primary: #e7ecf4 - メインテキスト</p>
+      <p className="text-ink-secondary">ink-secondary: #9aa3b8 - 補助テキスト</p>
+      <p className="text-ink-muted">ink-muted: #6b7387 - 控えめテキスト</p>
+      <p className="text-ink-disabled">ink-disabled: #4b5161 - 無効テキスト</p>
     </div>
   </div>
 );
 
 export const AccentColors = () => (
   <div className="p-6 bg-surface-base">
-    <h2 className="text-xl font-bold text-ink-primary mb-6">Accent Colors</h2>
+    <h2 className="text-xl font-bold text-ink-primary mb-6">アクセントカラー</h2>
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
       <div className="p-4 bg-accent-blue rounded text-white text-center font-medium">
         blue: #2aa6ff
@@ -150,25 +150,25 @@ export const AccentColors = () => (
 
 export const TrackColors = () => (
   <div className="p-6 bg-surface-base">
-    <h2 className="text-xl font-bold text-ink-primary mb-6">Track Type Colors</h2>
+    <h2 className="text-xl font-bold text-ink-primary mb-6">トラックタイプカラー</h2>
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
       <div className="p-4 bg-track-video rounded text-white text-center font-medium">
-        video: #1d7fcc
+        video（動画）: #1d7fcc
       </div>
       <div className="p-4 bg-track-text rounded text-white text-center font-medium">
-        text: #d4952a
+        text（テキスト）: #d4952a
       </div>
       <div className="p-4 bg-track-image rounded text-white text-center font-medium">
-        image: #2ba88a
+        image（画像）: #2ba88a
       </div>
       <div className="p-4 bg-track-audio rounded text-white text-center font-medium">
-        audio: #3d5fb8
+        audio（BGM）: #3d5fb8
       </div>
       <div className="p-4 bg-track-se rounded text-white text-center font-medium">
-        se: #2e8da8
+        se（効果音）: #2e8da8
       </div>
       <div className="p-4 bg-track-adjust rounded text-white text-center font-medium">
-        adjust: #9b4fd6
+        adjust（調整）: #9b4fd6
       </div>
     </div>
   </div>

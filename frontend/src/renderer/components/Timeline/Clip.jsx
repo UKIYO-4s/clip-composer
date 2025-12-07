@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useDrag } from 'react-dnd';
-import { selectClip, resizeClipStart, resizeClipEnd } from '../../store/timelineSlice';
+import { selectClip, toggleClipSelection, resizeClipStart, resizeClipEnd } from '../../store/timelineSlice';
 
 // ドラッグ&ドロップ用アイテムタイプ
 export const ItemTypes = {
@@ -12,8 +12,10 @@ export const ItemTypes = {
  * Clip - タイムライン上のクリップコンポーネント
  * クリップタイプごとに色分けして表示
  */
-const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
+const Clip = ({ clip, layerId, pixelsPerFrame }) => {
   const dispatch = useDispatch();
+  const selectedClipIds = useSelector((state) => state.timeline.selectedClipIds);
+  const isSelected = selectedClipIds.includes(clip.id);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeType, setResizeType] = useState(null); // 'start' or 'end'
   const resizeDataRef = useRef({});
@@ -23,7 +25,7 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
     type: ItemTypes.CLIP,
     item: () => {
       // ドラッグ開始時にクリップを選択
-      dispatch(selectClip(clip.id));
+      dispatch(selectClip({ clipId: clip.id }));
       return {
         id: clip.id,
         layerId,
@@ -37,7 +39,7 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
       isDragging: monitor.isDragging(),
     }),
     canDrag: () => !isResizing, // リサイズ中はドラッグ無効
-  }), [clip, layerId, isResizing]);
+  }), [clip, layerId, isResizing, dispatch]);
 
   // クリップの幅計算
   const width = clip.durationFrames * pixelsPerFrame;
@@ -62,14 +64,20 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
     return colorMap[type] || 'bg-surface-raised';
   };
 
-  // クリップクリックで選択
-  const handleClick = (e) => {
+  // クリップクリックで選択（Shift+クリックでトグル）
+  const handleClick = useCallback((e) => {
     e.stopPropagation();
-    dispatch(selectClip(clip.id));
-  };
+    if (e.shiftKey) {
+      // Shift+クリック: 選択をトグル
+      dispatch(toggleClipSelection({ clipId: clip.id }));
+    } else {
+      // 通常クリック: 単一選択
+      dispatch(selectClip({ clipId: clip.id }));
+    }
+  }, [dispatch, clip.id]);
 
   // リサイズハンドルのマウスダウン
-  const handleResizeMouseDown = (e, type) => {
+  const handleResizeMouseDown = useCallback((e, type) => {
     e.stopPropagation();
     setIsResizing(true);
     setResizeType(type);
@@ -81,8 +89,8 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
     };
 
     // クリップを選択
-    dispatch(selectClip(clip.id));
-  };
+    dispatch(selectClip({ clipId: clip.id }));
+  }, [dispatch, clip.id, clip.startFrame, clip.durationFrames]);
 
   // リサイズ処理
   useEffect(() => {
@@ -120,6 +128,7 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
   return (
     <div
       ref={drag}
+      data-clip="true"
       className={`
         absolute top-1 bottom-1 rounded
         ${getClipColor(clip.type)}

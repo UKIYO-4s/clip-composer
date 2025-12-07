@@ -28,71 +28,71 @@ export default {
 
 export const Default = {
   args: {
-    placeholder: 'Enter text...',
+    placeholder: 'テキストを入力...',
   },
 };
 
 export const WithLabel = {
   args: {
-    label: 'Project Name',
-    placeholder: 'Enter project name...',
+    label: 'プロジェクト名',
+    placeholder: 'プロジェクト名を入力...',
   },
 };
 
 export const WithHelper = {
   args: {
-    label: 'Duration',
+    label: '長さ',
     placeholder: '30',
-    helper: 'Duration in seconds (max 60)',
+    helper: '秒単位（最大60秒）',
   },
 };
 
 export const WithError = {
   args: {
-    label: 'Email',
-    placeholder: 'Enter email...',
-    error: 'Please enter a valid email address',
+    label: 'メールアドレス',
+    placeholder: 'メールアドレスを入力...',
+    error: '有効なメールアドレスを入力してください',
     defaultValue: 'invalid-email',
   },
 };
 
 export const Disabled = {
   args: {
-    label: 'Read Only',
-    placeholder: 'Cannot edit',
+    label: '読み取り専用',
+    placeholder: '編集不可',
     disabled: true,
   },
 };
 
 export const AllStates = () => (
   <div className="flex flex-col gap-6 p-4 bg-surface-base w-80">
-    <h3 className="text-lg font-semibold text-ink-primary">Input States</h3>
+    <h3 className="text-lg font-semibold text-ink-primary">入力フィールドの状態</h3>
 
     <Input
-      placeholder="Default input"
+      placeholder="デフォルト入力"
     />
 
     <Input
-      label="With Label"
-      placeholder="Enter value..."
+      label="ラベル付き"
+      placeholder="値を入力..."
     />
 
     <Input
-      label="With Helper Text"
-      placeholder="Enter value..."
-      helper="This is helper text"
+      label="ヘルパーテキスト付き"
+      placeholder="値を入力..."
+      helper="これはヘルパーテキストです"
     />
 
     <Input
-      label="With Error"
-      placeholder="Enter value..."
-      error="This field has an error"
-      defaultValue="Invalid value"
+      label="エラー表示"
+      placeholder="値を入力..."
+      error="このフィールドにエラーがあります"
+      defaultValue="無効な値"
     />
 
     <Input
-      label="Disabled"
-      placeholder="Cannot edit"
+      label="無効"
+      placeholder="編集不可"
       disabled
     />
   </div>
@@ -100,34 +100,34 @@ export const AllStates = () => (
 
 export const FormExample = () => (
   <div className="flex flex-col gap-4 p-6 bg-surface-raised rounded-lg border border-line w-96">
-    <h3 className="text-lg font-semibold text-ink-primary">Export Settings</h3>
+    <h3 className="text-lg font-semibold text-ink-primary">書き出し設定</h3>
 
     <Input
-      label="Output Filename"
+      label="出力ファイル名"
       placeholder="my-video"
-      helper="Without extension"
+      helper="拡張子なし"
     />
 
     <Input
-      label="Width"
+      label="幅"
       type="number"
       placeholder="1080"
       defaultValue="1080"
     />
 
     <Input
-      label="Height"
+      label="高さ"
       type="number"
       placeholder="1920"
       defaultValue="1920"
     />
 
     <Input
-      label="Frame Rate"
+      label="フレームレート"
       type="number"
       placeholder="30"
       defaultValue="30"
-      helper="FPS (frames per second)"
+      helper="FPS（1秒あたりのフレーム数）"
     />
   </div>
 );

@@ -101,7 +101,7 @@ const initialState = {
   totalFrames: 900, // 30fps * 30s
   fps: 30,
   pixelsPerFrame: 2,
-  selectedClipId: null,
+  selectedClipIds: [],
   isPlaying: false,
   loopEnabled: false,
   playbackRate: 1.0,
@@ -131,8 +131,35 @@ const timelineSlice = createSlice({
         Object.assign(clip, updates);
       }
     },
+    // 単一選択（他の選択を解除）
     selectClip: (state, action) => {
-      state.selectedClipId = action.payload;
+      const clipId = action.payload.clipId || action.payload;
+      state.selectedClipIds = [clipId];
+    },
+    // 選択トグル（Shift+クリック用）
+    toggleClipSelection: (state, action) => {
+      const { clipId } = action.payload;
+      const index = state.selectedClipIds.indexOf(clipId);
+      if (index === -1) {
+        state.selectedClipIds.push(clipId);
+      } else {
+        state.selectedClipIds.splice(index, 1);
+      }
+    },
+    // 選択解除
+    clearSelection: (state) => {
+      state.selectedClipIds = [];
+    },
+    // 複数選択（範囲選択用）
+    selectClips: (state, action) => {
+      const { clipIds } = action.payload;
+      state.selectedClipIds = clipIds;
+    },
+    // 選択に追加（Shiftキー併用時）
+    addToSelection: (state, action) => {
+      const { clipIds } = action.payload;
+      const newIds = clipIds.filter(id => !state.selectedClipIds.includes(id));
+      state.selectedClipIds = [...state.selectedClipIds, ...newIds];
     },
     setPixelsPerFrame: (state, action) => {
       state.pixelsPerFrame = action.payload;
@@ -247,6 +274,10 @@ export const {
   removeClip,
   updateClip,
   selectClip,
+  toggleClipSelection,
+  clearSelection,
+  selectClips,
+  addToSelection,
   setPixelsPerFrame,
   resizeClipStart,
   resizeClipEnd,

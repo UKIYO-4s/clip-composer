@@ -3,9 +3,16 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   closeExportDialog,
   setExportSettings,
+  setExportMode,
+  setCsvPath,
   startExport,
+  startBatchExport,
   updateProgress,
+  updateBatchProgress,
+  addBatchError,
+  incrementBatchSuccess,
   exportSuccess,
+  batchExportComplete,
   exportError,
   cancelExport,
   selectExportState,
@@ -24,12 +31,20 @@ function ExportDialog() {
   const [outputPath, setOutputPath] = useState('');
   const [startTime, setStartTime] = useState(null);
 
-  const { isExporting, isDialogOpen, progress, error } = exportState;
+  const {
+    isExporting,
+    isDialogOpen,
+    progress,
+    error,
+    exportMode,
+    csvPath,
+    batchProgress
+  } = exportState;
 
   // ダイアログが開いていなければ何も表示しない
   if (!isDialogOpen) return null;
 
-  // 出力先選択
+  // 出力先選択（単発書き出し用）
   const handleSelectOutput = async () => {
     try {
       const result = await window.api.saveFile({
@@ -44,6 +59,41 @@ function ExportDialog() {
     }
   };
 
+  // 出力ディレクトリ選択（CSV一括書き出し用）
+  const handleSelectOutputDir = async () => {
+    try {
+      const result = await window.api.selectDirectory({
+        title: '出力先フォルダを選択',
+      });
+      if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
+        setOutputPath(result.filePaths[0]);
+      }
+    } catch (err) {
+      console.error('Failed to select output directory:', err);
+    }
+  };
+
+  // CSVファイル選択
+  const handleSelectCsv = async () => {
+    try {
+      const result = await window.api.openFile({
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+        properties: ['openFile'],
+      });
+      if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
+        dispatch(setCsvPath(result.filePaths[0]));
+      }
+    } catch (err) {
+      console.error('Failed to select CSV file:', err);
+    }
+  };
+
+  // 書き出しモード変更
+  const handleModeChange = (mode) => {
+    dispatch(setExportMode(mode));
+    setOutputPath('');
+  };
+
   // 解像度取得
   const getResolution = () => {
     if (settings.resolution === 'custom') {
@@ -54,6 +104,15 @@ function ExportDialog() {
 
   // 書き出し開始
   const handleStartExport = async () => {
+    if (exportMode === 'single') {
+      await handleSingleExport();
+    } else {
+      await handleBatchExport();
+    }
+  };
+
+  // 単発書き出し
+  const handleSingleExport = async () => {
     if (!outputPath) {
       alert('出力先を選択してください');
       return;
@@ -110,6 +169,78 @@ function ExportDialog() {
     }
   };
 
+  // CSV一括書き出し
+  const handleBatchExport = async () => {
+    if (!csvPath) {
+      alert('CSVファイルを選択してください');
+      return;
+    }
+    if (!outputPath) {
+      alert('出力先フォルダを選択してください');
+      return;
+    }
+
+    const resolution = getResolution();
+
+    // タイムラインデータを準備
+    const timelineData = {
+      fps: settings.fps,
+      totalFrames: timeline.totalFrames,
+      layers: timeline.layers,
+      layerOrder: timeline.layerOrder,
+    };
+
+    const options = {
+      resolution: [resolution.width, resolution.height],
+      fps: settings.fps,
+      codec: settings.codec,
+      quality: settings.quality,
+    };
+
+    dispatch(startBatchExport({ total: 0 }));
+    setStartTime(Date.now());
+
+    try {
+      // 進捗リスナーを設定
+      const removeProgressListener = window.api.python.onProgress((data) => {
+        // バッチ処理の進捗を処理
+        if (data.current !== undefined && data.total !== undefined) {
+          dispatch(updateBatchProgress({
+            current: data.current,
+            total: data.total,
+            message: data.message || `処理中... (${data.current}/${data.total})`,
+          }));
+        }
+
+        // 行単位の結果を処理
+        if (data.type === 'row_result') {
+          if (data.success) {
+            dispatch(incrementBatchSuccess());
+          } else {
+            dispatch(addBatchError({
+              row: data.row_number,
+              videoName: data.video_name,
+              error: data.error,
+            }));
+          }
+        }
+      });
+
+      // CSV一括レンダリング実行
+      const result = await window.api.python.renderBatch(timelineData, csvPath, outputPath, options);
+
+      removeProgressListener();
+
+      if (result.success) {
+        dispatch(batchExportComplete(result.data));
+      } else {
+        dispatch(exportError(result.error || '不明なエラー'));
+      }
+    } catch (err) {
+      dispatch(exportError(err.message));
+    }
+  };
+
   // キャンセル
   const handleCancel = async () => {
     if (isExporting) {
@@ -146,17 +277,96 @@ function ExportDialog() {
         {/* コンテンツ */}
         <div className="p-4 space-y-4">
           {isExporting ? (
-            <ExportProgress
-              progress={progress}
-              currentTask={exportState.currentTask}
-              elapsedTime={exportState.elapsedTime}
-              estimatedRemaining={exportState.estimatedRemaining}
-              error={error}
-              outputPath={outputPath}
-              onCancel={handleCancel}
-            />
+            <>
+              <ExportProgress
+                progress={progress}
+                currentTask={exportState.currentTask}
+                elapsedTime={exportState.elapsedTime}
+                estimatedRemaining={exportState.estimatedRemaining}
+                error={error}
+                outputPath={outputPath}
+                onCancel={handleCancel}
+              />
+              {/* バッチ処理の進捗詳細 */}
+              {exportMode === 'batch' && batchProgress.total > 0 && (
+                <div className="mt-4 p-3 rounded border border-line bg-surface text-sm">
+                  <div className="flex justify-between mb-2">
+                    <span className="text-ink-secondary">進捗:</span>
+                    <span className="text-white font-semibold">
+                      {batchProgress.current} / {batchProgress.total}
+                    </span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-ink-secondary">成功:</span>
+                    <span className="text-accent-green">{batchProgress.successCount}件</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink-secondary">失敗:</span>
+                    <span className="text-accent-red">{batchProgress.errorCount}件</span>
+                  </div>
+                  {batchProgress.errors.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-line">
+                      <div className="text-ink-secondary mb-1">エラー詳細:</div>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {batchProgress.errors.map((err, idx) => (
+                          <div key={idx} className="text-xs text-accent-red">
+                            行{err.row} ({err.videoName}): {err.error}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           ) : (
             <>
+              {/* 書き出しモード選択 */}
+              <div>
+                <label className="mb-2 block text-sm text-ink-secondary">書き出しモード</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={exportMode === 'single' ? 'primary' : 'subtle'}
+                    size="md"
+                    onClick={() => handleModeChange('single')}
+                    className="flex-1"
+                  >
+                    単発書き出し
+                  </Button>
+                  <Button
+                    variant={exportMode === 'batch' ? 'primary' : 'subtle'}
+                    size="md"
+                    onClick={() => handleModeChange('batch')}
+                    className="flex-1"
+                  >
+                    CSV一括書き出し
+                  </Button>
+                </div>
+              </div>
+
+              {/* CSV一括書き出しの場合のCSV選択 */}
+              {exportMode === 'batch' && (
+                <div>
+                  <label className="mb-1 block text-sm text-ink-secondary">CSVファイル</label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={csvPath || ''}
+                      placeholder="CSVファイルを選択..."
+                      readOnly
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="subtle"
+                      size="md"
+                      onClick={handleSelectCsv}
+                    >
+                      参照
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* 解像度 */}
               <Select
                 label="解像度"
@@ -219,19 +429,21 @@ function ExportDialog() {
 
               {/* 出力先 */}
               <div>
-                <label className="mb-1 block text-sm text-ink-secondary">出力先</label>
+                <label className="mb-1 block text-sm text-ink-secondary">
+                  {exportMode === 'single' ? '出力先' : '出力先フォルダ'}
+                </label>
                 <div className="flex gap-2">
                   <Input
                     type="text"
                     value={outputPath}
-                    placeholder="出力ファイルを選択..."
+                    placeholder={exportMode === 'single' ? '出力ファイルを選択...' : '出力先フォルダを選択...'}
                     readOnly
                     className="flex-1"
                   />
                   <Button
                     variant="subtle"
                     size="md"
-                    onClick={handleSelectOutput}
+                    onClick={exportMode === 'single' ? handleSelectOutput : handleSelectOutputDir}
                   >
                     参照
                   </Button>
@@ -262,7 +474,7 @@ function ExportDialog() {
               variant="primary"
               size="md"
               onClick={handleStartExport}
-              disabled={!outputPath}
+              disabled={exportMode === 'single' ? !outputPath : (!csvPath || !outputPath)}
             >
               エクスポート
             </Button>

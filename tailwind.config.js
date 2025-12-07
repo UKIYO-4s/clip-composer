@@ -47,6 +47,8 @@ export default {
         audio: '#3d5fb8',
         se: '#2e8da8',
         adjust: '#9b4fd6',
+        random: '#6b8e23',  // オリーブグリーン（ランダムレイヤー）
+        vartext: '#cc6699', // ローズピンク（可変テキスト）
       },
     },
 
