@@ -13,6 +13,7 @@ import {
   selectRecentFiles,
   loadProjectState,
 } from '../../store/projectSlice';
+import { FilePlus, FolderOpen, Save, Clock, ChevronRight } from '../Icons';
 
 const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -92,80 +93,85 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
       {/* File menu button */}
       <button
         onClick={handleMenuClick}
-        className="px-3 py-1 hover:bg-gray-700 rounded text-sm font-medium transition-colors"
+        className="px-3 py-1 hover:bg-state-hover rounded text-sm font-medium transition-colors text-ink-primary"
       >
         File
       </button>
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-gray-800 border border-gray-600 rounded shadow-lg z-50">
+        <div className="absolute top-full left-0 mt-1 w-64 bg-surface-highest border border-line rounded shadow-lg z-50">
           {/* New Project */}
           <button
             onClick={handleNewProject}
-            className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center justify-between text-sm transition-colors"
+            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
           >
-            <span>New Project</span>
-            <span className="text-xs text-gray-400">Ctrl+N</span>
+            <FilePlus className="w-4 h-4 text-ink-muted" />
+            <span className="flex-1">New Project</span>
+            <span className="text-xs text-ink-muted">Ctrl+N</span>
           </button>
 
           {/* Open Project */}
           <button
             onClick={handleOpenProject}
-            className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center justify-between text-sm transition-colors"
+            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
           >
-            <span>Open Project</span>
-            <span className="text-xs text-gray-400">Ctrl+O</span>
+            <FolderOpen className="w-4 h-4 text-ink-muted" />
+            <span className="flex-1">Open Project</span>
+            <span className="text-xs text-ink-muted">Ctrl+O</span>
           </button>
 
-          <div className="border-t border-gray-600 my-1"></div>
+          <div className="border-t border-line my-1"></div>
 
           {/* Save */}
           <button
             onClick={handleSave}
-            className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center justify-between text-sm transition-colors"
+            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
           >
-            <span>Save{isDirty ? ' *' : ''}</span>
-            <span className="text-xs text-gray-400">Ctrl+S</span>
+            <Save className="w-4 h-4 text-ink-muted" />
+            <span className="flex-1">Save{isDirty ? ' *' : ''}</span>
+            <span className="text-xs text-ink-muted">Ctrl+S</span>
           </button>
 
           {/* Save As */}
           <button
             onClick={handleSaveAs}
-            className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center justify-between text-sm transition-colors"
+            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
           >
-            <span>Save As...</span>
-            <span className="text-xs text-gray-400">Ctrl+Shift+S</span>
+            <Save className="w-4 h-4 text-ink-muted" />
+            <span className="flex-1">Save As...</span>
+            <span className="text-xs text-ink-muted">Ctrl+Shift+S</span>
           </button>
 
           {/* Recent Files */}
           {recentFiles.length > 0 && (
             <>
-              <div className="border-t border-gray-600 my-1"></div>
+              <div className="border-t border-line my-1"></div>
               <div className="relative">
                 <button
                   onMouseEnter={() => setRecentFilesOpen(true)}
-                  className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center justify-between text-sm transition-colors"
+                  className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
                 >
-                  <span>Recent Files</span>
-                  <span className="text-xs">▶</span>
+                  <Clock className="w-4 h-4 text-ink-muted" />
+                  <span className="flex-1">Recent Files</span>
+                  <ChevronRight className="w-4 h-4 text-ink-muted" />
                 </button>
 
                 {/* Recent files submenu */}
                 {recentFilesOpen && (
                   <div
-                    className="absolute left-full top-0 ml-1 w-80 bg-gray-800 border border-gray-600 rounded shadow-lg max-h-96 overflow-y-auto"
+                    className="absolute left-full top-0 ml-1 w-80 bg-surface-highest border border-line rounded shadow-lg max-h-96 overflow-y-auto"
                     onMouseLeave={() => setRecentFilesOpen(false)}
                   >
                     {recentFiles.map((filePath, index) => (
                       <button
                         key={index}
                         onClick={() => handleRecentFileClick(filePath)}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-700 text-sm transition-colors block truncate"
+                        className="w-full px-4 py-2 text-left hover:bg-state-hover text-sm transition-colors block truncate text-ink-primary"
                         title={filePath}
                       >
                         <div className="font-medium">{getFileName(filePath)}</div>
-                        <div className="text-xs text-gray-400 truncate">{filePath}</div>
+                        <div className="text-xs text-ink-muted truncate">{filePath}</div>
                       </button>
                     ))}
                   </div>

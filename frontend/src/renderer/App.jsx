@@ -9,6 +9,7 @@ import AssetPanel from './components/AssetPanel';
 import FileMenu from './components/Menu/FileMenu';
 import ExportDialog from './components/ExportDialog';
 import { openExportDialog } from './store/exportSlice';
+import { Button } from './components/ui';
 import {
   removeClip,
   splitClip,
@@ -399,9 +400,9 @@ function App() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="h-full w-full bg-bg-primary text-text-primary flex flex-col">
+      <div className="flex h-full w-full flex-col bg-surface-base text-ink-primary">
         {/* Header */}
-        <header className="h-12 bg-bg-secondary border-b border-border-color flex items-center justify-between px-4">
+        <header className="flex h-12 items-center justify-between border-b border-line bg-surface-raised px-4">
           <div className="flex items-center gap-4">
             <FileMenu
               onNewProject={handleNewProject}
@@ -411,28 +412,29 @@ function App() {
             />
             <h1 className="text-lg font-semibold">
               {projectName}
-              {isDirty && <span className="text-yellow-500 ml-2">*</span>}
+              {isDirty && <span className="ml-2 text-accent-amber">*</span>}
             </h1>
             {projectPath && (
-              <span className="text-xs text-gray-400 truncate max-w-xs" title={projectPath}>
+              <span className="max-w-xs truncate text-xs text-ink-muted" title={projectPath}>
                 {projectPath}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-white text-sm font-medium"
+            <Button
+              variant="primary"
+              size="md"
               onClick={handleOpenExport}
             >
               Export
-            </button>
+            </Button>
           </div>
         </header>
 
         {/* Main Content Area */}
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar - 素材パネル */}
-          <aside className="w-64 bg-gray-800 border-r border-gray-700 flex-shrink-0 relative">
+          <aside className="relative w-64 flex-shrink-0 border-r border-line-subtle bg-surface-sunken">
             <AssetPanel />
           </aside>
 
@@ -442,7 +444,7 @@ function App() {
           </main>
 
           {/* Right Sidebar - プロパティパネル */}
-          <aside className="w-80 bg-gray-800 border-l border-gray-700 flex-shrink-0">
+          <aside className="w-80 flex-shrink-0 border-l border-line-subtle bg-surface-sunken">
             <PropertyPanel />
           </aside>
         </div>
@@ -451,8 +453,8 @@ function App() {
         <Timeline />
 
         {/* Footer */}
-        <footer className="h-6 bg-bg-secondary border-t border-border-color flex items-center justify-center">
-          <span className="text-xs text-text-secondary">Clip Composer v1.0.0</span>
+        <footer className="flex h-6 items-center justify-center border-t border-line bg-surface-raised">
+          <span className="text-xs text-ink-muted">Clip Composer v1.0.0</span>
         </footer>
 
         {/* Export Dialog */}

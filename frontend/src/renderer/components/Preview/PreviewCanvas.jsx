@@ -62,11 +62,22 @@ function PreviewCanvas() {
 
     // クリップがない場合のプレースホルダー表示
     if (visibleClips.length === 0) {
-      ctx.fillStyle = '#374151';
+      // 背景: bg-surface-sunken
+      ctx.fillStyle = '#0b0d11';
+      ctx.fillRect(0, 0, width, height);
+
+      // テキスト: text-ink-muted
+      ctx.fillStyle = '#6b7387';
       ctx.font = '24px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = 2;
+      ctx.shadowOffsetY = 1;
       ctx.fillText('No clips at current frame', width / 2, height / 2);
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
       return;
     }
 

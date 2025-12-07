@@ -128,10 +128,10 @@ function Timeline() {
           style={{ left: `${i * secondWidth}px` }}
         >
           <div
-            className={`w-px ${isMainMark ? 'h-4 bg-gray-400' : 'h-2 bg-gray-600'}`}
+            className={`w-px ${isMainMark ? 'h-4 bg-line' : 'h-2 bg-line-subtle'}`}
           />
           {isMainMark && (
-            <span className="text-xs text-gray-400 mt-1">{i}s</span>
+            <span className="text-xs text-ink-secondary mt-1">{i}s</span>
           )}
         </div>
       );
@@ -143,8 +143,8 @@ function Timeline() {
 
   return (
     <div
-      className={`flex flex-col h-64 bg-gray-900 border-t border-gray-700 ${
-        isDragOver ? 'ring-2 ring-blue-500 ring-inset' : ''
+      className={`flex flex-col h-64 bg-surface-sunken border-t border-line ${
+        isDragOver ? 'ring-2 ring-accent-blue ring-inset' : ''
       }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -154,12 +154,12 @@ function Timeline() {
       <TransportControls />
 
       {/* ヘッダー: タイムコード表示 */}
-      <div className="flex items-center h-8 bg-gray-800 border-b border-gray-700 px-4">
-        <div className="w-20 text-sm text-gray-400">Time:</div>
-        <div className="font-mono text-sm text-white">
+      <div className="flex items-center h-8 bg-surface-raised border-b border-line px-4">
+        <div className="w-20 text-sm text-ink-secondary">Time:</div>
+        <div className="font-mono text-sm text-ink-primary">
           {frameToTimecode(currentFrame)}
         </div>
-        <div className="ml-4 text-xs text-gray-500">
+        <div className="ml-4 text-xs text-ink-secondary">
           Frame: {currentFrame} / {totalFrames}
         </div>
       </div>
@@ -167,20 +167,16 @@ function Timeline() {
       {/* タイムライン本体 */}
       <div className="flex flex-1 overflow-hidden">
         {/* レイヤーラベル */}
-        <div className="w-20 flex-shrink-0 bg-gray-800 border-r border-gray-700">
+        <div className="w-20 flex-shrink-0 bg-surface-raised border-r border-line">
           {/* タイムルーラー用スペース */}
-          <div className="h-6 border-b border-gray-700" />
+          <div className="h-6 border-b border-line" />
           {/* レイヤー名 */}
           {layerOrder.map((layerId) => (
             <div
               key={layerId}
-              className={`h-12 flex items-center px-2 border-b border-gray-700 ${
-                layers[layerId].type === 'video'
-                  ? 'bg-blue-900/30'
-                  : 'bg-purple-900/30'
-              }`}
+              className="h-12 flex items-center px-2 border-b border-line hover:bg-state-hover"
             >
-              <span className="text-xs font-medium text-gray-300">
+              <span className="text-xs font-medium text-ink-secondary">
                 {layers[layerId].name}
               </span>
             </div>
@@ -198,7 +194,7 @@ function Timeline() {
             style={{ width: `${timelineWidth}px`, minWidth: '100%' }}
           >
             {/* タイムルーラー */}
-            <div className="h-6 relative bg-gray-800 border-b border-gray-700">
+            <div className="h-6 relative bg-surface-sunken border-b border-line">
               {renderTimeRuler()}
             </div>
 
@@ -214,11 +210,11 @@ function Timeline() {
 
             {/* 再生ヘッド */}
             <div
-              className="absolute top-0 bottom-0 w-0.5 bg-red-500 pointer-events-none z-10"
+              className="absolute top-0 bottom-0 w-0.5 bg-accent-red pointer-events-none z-10"
               style={{ left: `${currentFrame * pixelsPerFrame}px` }}
             >
               {/* 再生ヘッドのつまみ */}
-              <div className="absolute -top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-red-500 rounded-sm" />
+              <div className="absolute -top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent-red rounded-sm" />
             </div>
           </div>
         </div>
@@ -226,8 +222,8 @@ function Timeline() {
 
       {/* ドラッグオーバー時のオーバーレイ */}
       {isDragOver && (
-        <div className="absolute inset-0 bg-blue-500/20 pointer-events-none flex items-center justify-center">
-          <div className="bg-gray-800 px-4 py-2 rounded-lg text-white text-sm">
+        <div className="absolute inset-0 bg-accent-blue/20 pointer-events-none flex items-center justify-center">
+          <div className="bg-surface-raised px-4 py-2 rounded-lg text-white text-sm">
             ファイルをドロップして追加
           </div>
         </div>

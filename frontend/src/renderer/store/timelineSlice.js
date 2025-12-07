@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createSelector } from '@reduxjs/toolkit';
 
 // ユニークID生成
 const generateId = () => `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -267,25 +267,29 @@ export const selectTotalFrames = (state) => state.timeline.totalFrames;
 export const selectFps = (state) => state.timeline.fps;
 export const selectIsPlaying = (state) => state.timeline.isPlaying;
 export const selectLoopEnabled = (state) => state.timeline.loopEnabled;
+export const selectLayers = (state) => state.timeline.layers;
+export const selectLayerOrder = (state) => state.timeline.layerOrder;
 
-// 現在フレームで表示すべきクリップを取得するセレクター
-export const selectVisibleClips = (state) => {
-  const { layers, layerOrder, currentFrame } = state.timeline;
-  const visibleClips = [];
+// 現在フレームで表示すべきクリップを取得するセレクター（メモ化版）
+export const selectVisibleClips = createSelector(
+  [selectLayers, selectLayerOrder, selectCurrentFrame],
+  (layers, layerOrder, currentFrame) => {
+    const visibleClips = [];
 
-  [...layerOrder].reverse().forEach((layerId) => {
-    const layer = layers[layerId];
-    layer.clips.forEach((clip) => {
-      const clipEndFrame = clip.startFrame + clip.durationFrames;
-      if (currentFrame >= clip.startFrame && currentFrame < clipEndFrame) {
-        visibleClips.push({
-          ...clip,
-          layerId,
-          layerType: layer.type,
-        });
-      }
+    [...layerOrder].reverse().forEach((layerId) => {
+      const layer = layers[layerId];
+      layer.clips.forEach((clip) => {
+        const clipEndFrame = clip.startFrame + clip.durationFrames;
+        if (currentFrame >= clip.startFrame && currentFrame < clipEndFrame) {
+          visibleClips.push({
+            ...clip,
+            layerId,
+            layerType: layer.type,
+          });
+        }
+      });
     });
-  });
 
-  return visibleClips;
-};
+    return visibleClips;
+  }
+);

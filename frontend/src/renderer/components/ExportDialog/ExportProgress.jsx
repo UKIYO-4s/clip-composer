@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '../ui';
 
 function ExportProgress({
   progress,
@@ -37,18 +38,18 @@ function ExportProgress({
     <div className="space-y-4">
       {/* プログレスバー */}
       <div>
-        <div className="flex justify-between text-sm text-gray-300 mb-1">
+        <div className="mb-1 flex justify-between text-sm text-ink-secondary">
           <span>{currentTask}</span>
           <span>{Math.round(progress)}%</span>
         </div>
-        <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+        <div className="h-3 w-full overflow-hidden rounded-full bg-surface-highest">
           <div
             className={`h-full rounded-full transition-all duration-300 ${
               isFailed
-                ? 'bg-red-500'
+                ? 'bg-accent-red'
                 : isComplete
-                ? 'bg-green-500'
-                : 'bg-blue-500'
+                ? 'bg-accent-green'
+                : 'bg-accent-blue'
             }`}
             style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
           />
@@ -57,7 +58,7 @@ function ExportProgress({
 
       {/* 時間情報 */}
       {!isComplete && !isFailed && (
-        <div className="flex justify-between text-sm text-gray-400">
+        <div className="flex justify-between text-sm text-ink-muted">
           <span>Elapsed: {formatTime(elapsedTime)}</span>
           <span>Remaining: ~{formatTime(estimatedRemaining)}</span>
         </div>
@@ -65,7 +66,7 @@ function ExportProgress({
 
       {/* エラー表示 */}
       {isFailed && (
-        <div className="p-3 bg-red-900/50 border border-red-700 rounded text-red-300 text-sm">
+        <div className="rounded border border-accent-red/50 bg-accent-red/10 p-3 text-sm text-accent-red">
           <div className="font-semibold mb-1">Export Failed</div>
           <div>{error}</div>
         </div>
@@ -73,9 +74,9 @@ function ExportProgress({
 
       {/* 完了メッセージ */}
       {isComplete && (
-        <div className="p-3 bg-green-900/50 border border-green-700 rounded text-green-300 text-sm">
-          <div className="font-semibold mb-1">Export Complete!</div>
-          <div className="text-xs text-green-400 truncate">{outputPath}</div>
+        <div className="rounded border border-accent-green/50 bg-accent-green/10 p-3 text-sm text-accent-green">
+          <div className="mb-1 font-semibold">Export Complete!</div>
+          <div className="truncate text-xs text-accent-green/80">{outputPath}</div>
         </div>
       )}
 
@@ -83,27 +84,30 @@ function ExportProgress({
       <div className="flex justify-end gap-2 pt-2">
         {isComplete ? (
           <>
-            <button
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded text-white"
+            <Button
+              variant="ghost"
+              size="md"
               onClick={onCancel}
             >
               Close
-            </button>
-            <button
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white"
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
               onClick={handleOpenFolder}
             >
               Show in Folder
-            </button>
+            </Button>
           </>
         ) : (
-          <button
-            className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded text-white"
+          <Button
+            variant="danger"
+            size="md"
             onClick={onCancel}
             disabled={isFailed}
           >
             {isFailed ? 'Close' : 'Cancel'}
-          </button>
+          </Button>
         )}
       </div>
     </div>

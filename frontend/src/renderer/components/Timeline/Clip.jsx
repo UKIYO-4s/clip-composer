@@ -51,14 +51,14 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
   // クリップタイプごとの色分け
   const getClipColor = (type) => {
     const colorMap = {
-      video: 'bg-blue-600',
-      text: 'bg-yellow-500',
-      image: 'bg-green-500',
-      bgm: 'bg-purple-600',
-      se: 'bg-cyan-500',
-      adjustment: 'bg-pink-500',
+      video: 'bg-clip-video',
+      text: 'bg-clip-text',
+      image: 'bg-clip-image',
+      bgm: 'bg-clip-audio',
+      se: 'bg-clip-se',
+      adjustment: 'bg-clip-adjust',
     };
-    return colorMap[type] || 'bg-gray-500';
+    return colorMap[type] || 'bg-surface-raised';
   };
 
   // クリップクリックで選択
@@ -122,10 +122,12 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
       className={`
         absolute top-1 bottom-1 rounded
         ${getClipColor(clip.type)}
+        border border-line
+        shadow-[0_1px_0_rgba(0,0,0,0.35)]
         hover:brightness-110
         cursor-grab active:cursor-grabbing
         flex items-center px-2
-        ${isSelected ? 'ring-2 ring-white ring-offset-1 ring-offset-gray-900' : ''}
+        ${isSelected ? 'ring-2 ring-accent-blue/80 shadow-glow-blue' : ''}
         ${isDragging ? 'opacity-50' : ''}
         overflow-hidden
         transition-all duration-100
@@ -141,19 +143,20 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
     >
       {/* 左端リサイズハンドル */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 bg-white/50 hover:bg-white/80 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="absolute left-0 top-0 bottom-0 w-1 bg-ink-primary/50 hover:bg-ink-primary/80 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity z-10"
         onMouseDown={(e) => handleResizeMouseDown(e, 'start')}
         onClick={(e) => e.stopPropagation()}
       />
 
+      {/* クリップテキスト - 選択状態でもテキスト色は変更しない */}
       <div className="flex flex-col justify-center min-w-0 w-full">
         {/* クリップ名（省略表示） */}
-        <div className="text-white text-xs font-semibold truncate">
+        <div className="text-[12px] font-semibold text-ink-primary truncate text-shadow-clip">
           {clip.name}
         </div>
         {/* 長さ（秒数表示） */}
         {width > 40 && (
-          <div className="text-white text-xs opacity-80">
+          <div className="text-[12px] text-ink-primary opacity-80 text-shadow-clip">
             {durationSeconds}s
           </div>
         )}
@@ -161,7 +164,7 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
 
       {/* 右端リサイズハンドル */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-1 bg-white/50 hover:bg-white/80 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="absolute right-0 top-0 bottom-0 w-1 bg-ink-primary/50 hover:bg-ink-primary/80 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity z-10"
         onMouseDown={(e) => handleResizeMouseDown(e, 'end')}
         onClick={(e) => e.stopPropagation()}
       />

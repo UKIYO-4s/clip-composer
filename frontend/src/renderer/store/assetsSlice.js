@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createSelector } from '@reduxjs/toolkit';
 
 // ユニークID生成
 const generateId = () => `asset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -98,19 +98,20 @@ export const selectSelectedAssetId = (state) => state.assets.selectedAssetId;
 export const selectFilter = (state) => state.assets.filter;
 export const selectSearchQuery = (state) => state.assets.searchQuery;
 
-// フィルタリングされた素材を取得
-export const selectFilteredAssets = (state) => {
-  const { items, filter, searchQuery } = state.assets;
-
-  return items.filter((asset) => {
-    // タイプフィルター
-    if (filter !== 'all' && asset.type !== filter) {
-      return false;
-    }
-    // 検索フィルター
-    if (searchQuery && !asset.name.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-    return true;
-  });
-};
+// フィルタリングされた素材を取得（メモ化版）
+export const selectFilteredAssets = createSelector(
+  [selectAllAssets, selectFilter, selectSearchQuery],
+  (items, filter, searchQuery) => {
+    return items.filter((asset) => {
+      // タイプフィルター
+      if (filter !== 'all' && asset.type !== filter) {
+        return false;
+      }
+      // 検索フィルター
+      if (searchQuery && !asset.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+  }
+);

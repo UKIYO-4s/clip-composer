@@ -41,12 +41,12 @@ export default {
         active: 'rgba(255,255,255,0.08)',
       },
       clip: {
-        video: '#2aa6ff',
-        text: '#f2c14f',
-        image: '#6be7c8',
-        audio: '#8ab5ff',
-        se: '#69d5f7',
-        adjust: '#c26cff',
+        video: '#1d7fcc',
+        text: '#b5851f',
+        image: '#2ba88a',
+        audio: '#3d5fb8',  // -10% brightness from #4c74d4
+        se: '#2e8da8',     // -10% brightness from #3ba8c4
+        adjust: '#9b4fd6',
       },
     },
 

@@ -25,16 +25,16 @@ function Preview() {
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-gray-950 p-4">
+    <div className="flex-1 flex items-center justify-center bg-surface-base p-4">
       <div className="relative w-full max-w-4xl">
         {/* 16:9 アスペクト比コンテナ */}
         <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-          <div className="absolute inset-0 bg-black rounded-lg overflow-hidden border border-gray-700 shadow-lg">
+          <div className="absolute inset-0 bg-black rounded-lg overflow-hidden border border-line-subtle shadow-lg">
             {/* プレビューキャンバス */}
             <PreviewCanvas />
 
             {/* タイムコード表示（右下） */}
-            <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded text-xs font-mono text-white">
+            <div className="absolute bottom-2 right-2 bg-surface-base/80 shadow-md shadow-[0_1px_2px_rgba(0,0,0,0.6)] px-2 py-1 rounded text-xs text-ink-primary font-mono">
               {frameToTimecode(currentFrame)}
             </div>
           </div>

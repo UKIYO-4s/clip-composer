@@ -12,6 +12,8 @@ import {
   setFilter,
   setSearchQuery,
 } from '../../store/assetsSlice';
+import { Film, Image, Music, File, X, Plus, FolderOpen } from '../Icons';
+import { Button, IconButton, Input } from '../ui';
 
 // ドラッグ用アイテムタイプ
 export const AssetItemTypes = {
@@ -32,12 +34,12 @@ const getAssetTypeFromFile = (fileName) => {
 };
 
 // アイコン取得
-const getAssetIcon = (type) => {
+const AssetIcon = ({ type, className = "w-4 h-4" }) => {
   switch (type) {
-    case 'video': return '🎬';
-    case 'image': return '🖼️';
-    case 'audio': return '🎵';
-    default: return '📄';
+    case 'video': return <Film className={className} />;
+    case 'image': return <Image className={className} />;
+    case 'audio': return <Music className={className} />;
+    default: return <File className={className} />;
   }
 };
 
@@ -63,27 +65,29 @@ function AssetItem({ asset, isSelected, onSelect, onRemove }) {
       className={`
         p-2 rounded cursor-grab active:cursor-grabbing
         flex items-center gap-2
-        ${isSelected ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}
+        ${isSelected ? 'bg-accent-blue' : 'bg-surface-highest hover:bg-state-hover'}
         ${isDragging ? 'opacity-50' : ''}
         transition-colors
       `}
       onClick={() => onSelect(asset.id)}
     >
-      <span className="text-lg">{getAssetIcon(asset.type)}</span>
+      <span className="text-ink-secondary"><AssetIcon type={asset.type} className="w-5 h-5" /></span>
       <div className="flex-1 min-w-0">
         <div className="text-sm text-white truncate">{asset.name}</div>
-        <div className="text-xs text-gray-400 capitalize">{asset.type}</div>
+        <div className="text-xs text-ink-muted capitalize">{asset.type}</div>
       </div>
-      <button
-        className="text-gray-400 hover:text-red-400 text-sm px-1"
+      <IconButton
+        variant="ghost"
+        size="sm"
+        className="text-ink-muted hover:text-accent-red"
         onClick={(e) => {
           e.stopPropagation();
           onRemove(asset.id);
         }}
         title="削除"
       >
-        ✕
-      </button>
+        <X className="w-4 h-4" />
+      </IconButton>
     </div>
   );
 }
@@ -161,65 +165,80 @@ function AssetPanel() {
   }, [dispatch]);
 
   const filterButtons = [
-    { value: 'all', label: 'All' },
-    { value: 'video', label: '🎬' },
-    { value: 'image', label: '🖼️' },
-    { value: 'audio', label: '🎵' },
+    { value: 'all', label: 'All', icon: null },
+    { value: 'video', label: null, icon: Film },
+    { value: 'image', label: null, icon: Image },
+    { value: 'audio', label: null, icon: Music },
   ];
 
   return (
     <div
-      className={`h-full flex flex-col bg-gray-800 ${
-        isDragOver ? 'ring-2 ring-blue-500 ring-inset' : ''
+      className={`h-full flex flex-col bg-surface-raised ${
+        isDragOver ? 'ring-2 ring-accent-blue ring-inset' : ''
       }`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {/* ヘッダー */}
-      <div className="p-3 border-b border-gray-700">
+      <div className="p-3 border-b border-line">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-gray-300">Assets</h2>
-          <button
-            className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 rounded text-white"
+          <h2 className="text-sm font-semibold text-ink-secondary">Assets</h2>
+          <Button
+            variant="primary"
+            size="sm"
             onClick={handleImportClick}
           >
-            + Import
-          </button>
+            <Plus className="w-3 h-3" />
+            Import
+          </Button>
         </div>
 
         {/* 検索 */}
-        <input
+        <Input
           type="text"
           placeholder="Search..."
-          className="w-full px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
           value={searchQuery}
           onChange={(e) => dispatch(setSearchQuery(e.target.value))}
+          className="w-full"
         />
 
         {/* フィルター */}
         <div className="flex gap-1 mt-2">
-          {filterButtons.map((btn) => (
-            <button
-              key={btn.value}
-              className={`px-2 py-1 text-xs rounded ${
-                filter === btn.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-              onClick={() => dispatch(setFilter(btn.value))}
-            >
-              {btn.label}
-            </button>
-          ))}
+          {filterButtons.map((btn) => {
+            const isActive = filter === btn.value;
+            if (btn.icon) {
+              return (
+                <IconButton
+                  key={btn.value}
+                  variant={isActive ? 'subtle' : 'ghost'}
+                  size="sm"
+                  className={isActive ? 'bg-accent-blue text-white hover:bg-accent-blue' : ''}
+                  onClick={() => dispatch(setFilter(btn.value))}
+                >
+                  <btn.icon className="w-4 h-4" />
+                </IconButton>
+              );
+            }
+            return (
+              <Button
+                key={btn.value}
+                variant={isActive ? 'primary' : 'subtle'}
+                size="sm"
+                onClick={() => dispatch(setFilter(btn.value))}
+              >
+                {btn.label}
+              </Button>
+            );
+          })}
         </div>
       </div>
 
       {/* アセットリスト */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {assets.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 text-sm">
-            <div className="text-3xl mb-2">📁</div>
+          <div className="text-center py-8 text-ink-muted text-sm">
+            <FolderOpen className="w-8 h-8 mx-auto mb-2" />
             <div>ファイルをドロップ</div>
             <div>または Import ボタン</div>
           </div>
@@ -238,8 +257,8 @@ function AssetPanel() {
 
       {/* ドラッグオーバーレイ */}
       {isDragOver && (
-        <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center pointer-events-none">
-          <div className="bg-gray-800 px-4 py-2 rounded-lg text-white text-sm">
+        <div className="absolute inset-0 bg-accent-blue/20 flex items-center justify-center pointer-events-none">
+          <div className="bg-surface-raised px-4 py-2 rounded-lg text-ink-primary text-sm">
             ファイルをドロップして追加
           </div>
         </div>

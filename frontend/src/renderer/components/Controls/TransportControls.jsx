@@ -5,6 +5,15 @@ import {
   setIsPlaying,
   setLoopEnabled,
 } from '../../store/timelineSlice';
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  ChevronLeft,
+  ChevronRight,
+  Repeat,
+} from '../Icons';
 
 function TransportControls() {
   const dispatch = useDispatch();
@@ -106,75 +115,77 @@ function TransportControls() {
   };
 
   return (
-    <div className="flex items-center gap-2 bg-gray-800 px-4 py-2 border-b border-gray-700">
+    <div className="flex items-center gap-2 bg-surface-raised px-4 py-2 border-b border-line">
       {/* 先頭へ移動 */}
       <button
         onClick={handleGoToStart}
-        className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 active:bg-gray-600 transition-colors"
+        className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
         title="Go to start (Home)"
       >
-        <span className="text-lg">⏮</span>
+        <SkipBack className="w-4 h-4" />
       </button>
 
       {/* 1フレーム戻る */}
       <button
         onClick={handleFrameBackward}
-        className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 active:bg-gray-600 transition-colors"
+        className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
         title="Previous frame (←)"
       >
-        <span className="text-lg">⏪</span>
+        <ChevronLeft className="w-5 h-5" />
       </button>
 
       {/* 再生/停止 */}
       <button
         onClick={handlePlayPause}
-        className="w-10 h-10 flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 active:bg-blue-800 transition-colors"
+        className="w-10 h-10 flex items-center justify-center rounded bg-accent-blue hover:bg-accent-blue/90 active:bg-accent-blue/80 transition-colors text-white"
         title="Play/Pause (Space)"
       >
-        <span className="text-xl">
-          {isPlaying ? '⏸' : '▶'}
-        </span>
+        {isPlaying ? (
+          <Pause className="w-5 h-5" />
+        ) : (
+          <Play className="w-5 h-5 ml-0.5" />
+        )}
       </button>
 
       {/* 1フレーム進む */}
       <button
         onClick={handleFrameForward}
-        className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 active:bg-gray-600 transition-colors"
+        className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
         title="Next frame (→)"
       >
-        <span className="text-lg">⏩</span>
+        <ChevronRight className="w-5 h-5" />
       </button>
 
       {/* 末尾へ移動 */}
       <button
         onClick={handleGoToEnd}
-        className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 active:bg-gray-600 transition-colors"
+        className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
         title="Go to end (End)"
       >
-        <span className="text-lg">⏭</span>
+        <SkipForward className="w-4 h-4" />
       </button>
 
       {/* 区切り線 */}
-      <div className="w-px h-6 bg-gray-600 mx-2" />
+      <div className="w-px h-6 bg-line mx-2" />
 
       {/* ループトグル */}
       <button
         onClick={handleToggleLoop}
         className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
           loopEnabled
-            ? 'bg-blue-600 hover:bg-blue-700'
-            : 'hover:bg-gray-700'
+            ? 'bg-accent-blue text-white hover:bg-accent-blue/90'
+            : 'hover:bg-state-hover text-ink-secondary hover:text-ink-primary'
         }`}
         title="Toggle loop (L)"
       >
-        <span className="text-lg">🔁</span>
+        <Repeat className="w-4 h-4" />
       </button>
 
       {/* 再生情報 */}
-      <div className="ml-4 text-xs text-gray-400">
-        {isPlaying && <span className="text-green-500">● </span>}
+      <div className="ml-4 text-xs text-ink-muted">
+        {isPlaying && <span className="text-accent-green">● </span>}
         {isPlaying ? 'Playing' : 'Stopped'}
-        {loopEnabled && <span className="ml-2 text-blue-400">(Loop)</span>}
+        {loopEnabled && <span className="ml-2 text-accent-blue">(Loop)</span>}
       </div>
     </div>
   );
