@@ -124,6 +124,18 @@ const timelineSlice = createSlice({
         (clip) => clip.id !== clipId
       );
     },
+    // 複数クリップ削除
+    removeClips: (state, action) => {
+      const { clipIds } = action.payload;
+
+      // 各レイヤーからクリップを削除
+      Object.values(state.layers).forEach(layer => {
+        layer.clips = layer.clips.filter(clip => !clipIds.includes(clip.id));
+      });
+
+      // 選択状態をクリア
+      state.selectedClipIds = [];
+    },
     updateClip: (state, action) => {
       const { layerId, clipId, updates } = action.payload;
       const clip = state.layers[layerId].clips.find((c) => c.id === clipId);
@@ -160,6 +172,74 @@ const timelineSlice = createSlice({
       const { clipIds } = action.payload;
       const newIds = clipIds.filter(id => !state.selectedClipIds.includes(id));
       state.selectedClipIds = [...state.selectedClipIds, ...newIds];
+    },
+    // Videoレイヤー追加
+    addVideoLayer: (state) => {
+      // 現在のVideoレイヤーの最大番号を取得
+      const videoLayerIds = Object.keys(state.layers).filter(id => id.startsWith('V'));
+      const maxNum = videoLayerIds.length > 0
+        ? Math.max(...videoLayerIds.map(id => parseInt(id.slice(1)) || 0))
+        : 0;
+      const newNum = maxNum + 1;
+      const newLayerId = `V${newNum}`;
+
+      // 新しいレイヤーを追加
+      state.layers[newLayerId] = {
+        id: newLayerId,
+        name: `Video ${newNum}`,
+        type: 'video',
+        clips: [],
+      };
+
+      // layerOrderに追加（Soundレイヤーの前に挿入）
+      const soundIndex = state.layerOrder.findIndex(id => id.startsWith('S'));
+      if (soundIndex === -1) {
+        state.layerOrder.push(newLayerId);
+      } else {
+        state.layerOrder.splice(soundIndex, 0, newLayerId);
+      }
+    },
+    // Soundレイヤー追加
+    addSoundLayer: (state) => {
+      // 現在のSoundレイヤーの最大番号を取得
+      const soundLayerIds = Object.keys(state.layers).filter(id => id.startsWith('S'));
+      const maxNum = soundLayerIds.length > 0
+        ? Math.max(...soundLayerIds.map(id => parseInt(id.slice(1)) || 0))
+        : 0;
+      const newNum = maxNum + 1;
+      const newLayerId = `S${newNum}`;
+
+      // 新しいレイヤーを追加
+      state.layers[newLayerId] = {
+        id: newLayerId,
+        name: `Sound ${newNum}`,
+        type: 'audio',
+        clips: [],
+      };
+
+      // layerOrderの末尾に追加
+      state.layerOrder.push(newLayerId);
+    },
+    // レイヤー削除
+    removeLayer: (state, action) => {
+      const { layerId } = action.payload;
+      const isVideo = layerId.startsWith('V');
+
+      // 同タイプのレイヤー数をカウント
+      const sameTypeCount = Object.keys(state.layers).filter(id =>
+        isVideo ? id.startsWith('V') : id.startsWith('S')
+      ).length;
+
+      // 最低1つは残す
+      if (sameTypeCount <= 1) return;
+
+      // 削除されたレイヤーのクリップが選択されている場合は選択解除
+      const layerClipIds = state.layers[layerId]?.clips.map(c => c.id) || [];
+      state.selectedClipIds = state.selectedClipIds.filter(id => !layerClipIds.includes(id));
+
+      // レイヤーを削除
+      delete state.layers[layerId];
+      state.layerOrder = state.layerOrder.filter(id => id !== layerId);
     },
     setPixelsPerFrame: (state, action) => {
       state.pixelsPerFrame = action.payload;
@@ -228,6 +308,42 @@ const timelineSlice = createSlice({
 
       layer.clips.push(duplicatedClip);
     },
+    // Option+ドラッグ: クリップを指定位置に複製
+    duplicateClipToPosition: (state, action) => {
+      const { fromLayerId, toLayerId, clipId, newStartFrame } = action.payload;
+      const fromLayer = state.layers[fromLayerId];
+      const toLayer = state.layers[toLayerId];
+
+      const clip = fromLayer.clips.find((c) => c.id === clipId);
+      if (!clip) return;
+
+      const duplicatedClip = {
+        ...clip,
+        id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        startFrame: Math.max(0, newStartFrame),
+      };
+
+      toLayer.clips.push(duplicatedClip);
+    },
+    // Option+ドラッグ: 複数クリップを指定位置に複製
+    duplicateClipsToPosition: (state, action) => {
+      const { clips, toLayerId, frameOffset } = action.payload;
+      const toLayer = state.layers[toLayerId];
+
+      clips.forEach(({ fromLayerId, clipId, originalStartFrame }) => {
+        const fromLayer = state.layers[fromLayerId];
+        const clip = fromLayer.clips.find((c) => c.id === clipId);
+        if (!clip) return;
+
+        const duplicatedClip = {
+          ...clip,
+          id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}-${clipId.slice(-4)}`,
+          startFrame: Math.max(0, originalStartFrame + frameOffset),
+        };
+
+        toLayer.clips.push(duplicatedClip);
+      });
+    },
     // ドラッグ&ドロップ: 同一レイヤー内での移動
     moveClip: (state, action) => {
       const { layerId, clipId, newStartFrame } = action.payload;
@@ -255,6 +371,56 @@ const timelineSlice = createSlice({
       // 移動先レイヤーに追加
       toLayer.clips.push(clip);
     },
+    // 複数クリップ移動（フレーム差分ベース）
+    moveClipsWithDelta: (state, action) => {
+      const { clipMoves, deltaFrame, targetLayerId } = action.payload;
+      // clipMoves: [{ fromLayerId, clipId, originalStartFrame }]
+
+      clipMoves.forEach(({ fromLayerId, clipId, originalStartFrame }) => {
+        const fromLayer = state.layers[fromLayerId];
+        if (!fromLayer) return;
+
+        const clipIndex = fromLayer.clips.findIndex(c => c.id === clipId);
+        if (clipIndex === -1) return;
+
+        const clip = fromLayer.clips[clipIndex];
+        const newStartFrame = Math.max(0, originalStartFrame + deltaFrame);
+
+        if (targetLayerId && targetLayerId !== fromLayerId) {
+          // レイヤー間移動
+          fromLayer.clips.splice(clipIndex, 1);
+          clip.startFrame = newStartFrame;
+          state.layers[targetLayerId].clips.push(clip);
+        } else {
+          // 同一レイヤー内移動
+          clip.startFrame = newStartFrame;
+        }
+      });
+    },
+    // 複数クリップ複製（フレーム差分ベース）
+    duplicateClipsWithDelta: (state, action) => {
+      const { clipMoves, deltaFrame, targetLayerId } = action.payload;
+      // clipMoves: [{ fromLayerId, clipId, originalStartFrame }]
+
+      clipMoves.forEach(({ fromLayerId, clipId, originalStartFrame }) => {
+        const fromLayer = state.layers[fromLayerId];
+        if (!fromLayer) return;
+
+        const clip = fromLayer.clips.find(c => c.id === clipId);
+        if (!clip) return;
+
+        const newStartFrame = Math.max(0, originalStartFrame + deltaFrame);
+        const destLayerId = targetLayerId || fromLayerId;
+
+        const newClip = {
+          ...clip,
+          id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}-${clipId.slice(-4)}`,
+          startFrame: newStartFrame,
+        };
+
+        state.layers[destLayerId].clips.push(newClip);
+      });
+    },
     // 再生コントロール
     setIsPlaying: (state, action) => {
       state.isPlaying = action.payload;
@@ -272,19 +438,27 @@ export const {
   setCurrentFrame,
   addClip,
   removeClip,
+  removeClips,
   updateClip,
   selectClip,
   toggleClipSelection,
   clearSelection,
   selectClips,
   addToSelection,
+  addVideoLayer,
+  addSoundLayer,
+  removeLayer,
   setPixelsPerFrame,
   resizeClipStart,
   resizeClipEnd,
   splitClip,
   duplicateClip,
+  duplicateClipToPosition,
+  duplicateClipsToPosition,
   moveClip,
   moveClipToLayer,
+  moveClipsWithDelta,
+  duplicateClipsWithDelta,
   setIsPlaying,
   setLoopEnabled,
   setPlaybackRate,

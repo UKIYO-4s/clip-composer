@@ -1,9 +1,10 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setCurrentFrame, addClip, clearSelection } from '../../store/timelineSlice';
+import { setCurrentFrame, addClip, clearSelection, addVideoLayer, addSoundLayer, removeLayer, removeClips } from '../../store/timelineSlice';
 import Layer from './Layer';
 import TransportControls from '../Controls/TransportControls';
 import MarqueeSelection from './MarqueeSelection';
+import { Plus, Minus } from '../Icons';
 
 // ファイル拡張子からクリップタイプを判定
 const getClipTypeFromFile = (fileName) => {
@@ -37,6 +38,7 @@ function Timeline() {
     totalFrames,
     fps,
     pixelsPerFrame,
+    selectedClipIds,
   } = useSelector((state) => state.timeline);
 
   const timelineRef = useRef(null);
@@ -68,22 +70,53 @@ function Timeline() {
     return [...videoLayers, ...soundLayers];
   }, [layerOrder]);
 
-  // 外部ファイルドロップハンドラー
+  // レイヤー削除可能かチェック（同タイプが2つ以上あれば削除可能）
+  const canDeleteLayer = useCallback((layerId) => {
+    const isVideo = layerId.startsWith('V');
+    const sameTypeCount = Object.keys(layers).filter(id =>
+      isVideo ? id.startsWith('V') : id.startsWith('S')
+    ).length;
+    return sameTypeCount > 1;
+  }, [layers]);
+
+  // レイヤー追加ハンドラー
+  const handleAddVideoLayer = useCallback(() => {
+    dispatch(addVideoLayer());
+  }, [dispatch]);
+
+  const handleAddSoundLayer = useCallback(() => {
+    dispatch(addSoundLayer());
+  }, [dispatch]);
+
+  // レイヤー削除ハンドラー
+  const handleRemoveLayer = useCallback((layerId) => {
+    dispatch(removeLayer({ layerId }));
+  }, [dispatch]);
+
+  // 外部ファイルドロップハンドラー（React DnDとの競合回避）
   const handleDragOver = useCallback((e) => {
+    // 外部ファイルドラッグの場合のみ処理（React DnDはスルー）
+    if (!e.dataTransfer.types.includes('Files')) {
+      return;
+    }
     e.preventDefault();
-    e.stopPropagation();
     setIsDragOver(true);
   }, []);
 
   const handleDragLeave = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    // 外部ファイルドラッグの場合のみ処理
+    if (!e.dataTransfer.types.includes('Files')) {
+      return;
+    }
     setIsDragOver(false);
   }, []);
 
   const handleDrop = useCallback((e) => {
+    // 外部ファイルドラッグの場合のみ処理（React DnDはスルー）
+    if (!e.dataTransfer.types.includes('Files')) {
+      return;
+    }
     e.preventDefault();
-    e.stopPropagation();
     setIsDragOver(false);
 
     const files = Array.from(e.dataTransfer.files);
@@ -172,6 +205,47 @@ function Timeline() {
     }
   }, [isDraggingPlayhead, handlePlayheadDrag, handlePlayheadDragEnd]);
 
+  // グローバルAltキー状態追跡（Option+ドラッグ複製用）
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Alt') {
+        window.__isAltPressed = true;
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      if (e.key === 'Alt') {
+        window.__isAltPressed = false;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.__isAltPressed = false;
+    };
+  }, []);
+
+  // Delete/Backspace キーで選択クリップを削除
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Delete または Backspace キー
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipIds.length > 0) {
+        // テキスト入力中は無視
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        e.preventDefault();
+        dispatch(removeClips({ clipIds: selectedClipIds }));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedClipIds, dispatch]);
+
   // 背景クリックで選択解除
   const handleBackgroundClick = useCallback((e) => {
     // クリップやルーラー上のクリックは無視
@@ -234,19 +308,54 @@ function Timeline() {
       <div className="flex flex-1 overflow-hidden">
         {/* レイヤーラベル */}
         <div className="w-20 flex-shrink-0 bg-surface-raised border-r border-line">
-          {/* タイムルーラー用スペース */}
-          <div className="h-6 border-b border-line" />
-          {/* レイヤー名 */}
-          {sortedLayerOrder.map((layerId) => (
-            <div
-              key={layerId}
-              className="h-12 flex items-center px-2 border-b border-line hover:bg-state-hover"
+          {/* タイムルーラー用スペース + Video追加ボタン */}
+          <div className="h-6 border-b border-line flex items-center justify-end px-1">
+            <button
+              onClick={handleAddVideoLayer}
+              className="w-4 h-4 flex items-center justify-center text-ink-muted hover:text-accent-blue hover:bg-state-hover rounded transition-colors"
+              title="Videoレイヤーを追加"
             >
-              <span className="text-xs font-medium text-ink-secondary">
-                {layers[layerId].name}
-              </span>
-            </div>
-          ))}
+              <Plus className="w-3 h-3" />
+            </button>
+          </div>
+          {/* レイヤー名 */}
+          {sortedLayerOrder.map((layerId, index) => {
+            const isVideo = layerId.startsWith('V');
+            const nextLayerId = sortedLayerOrder[index + 1];
+            const isLastVideo = isVideo && (!nextLayerId || nextLayerId.startsWith('S'));
+
+            return (
+              <React.Fragment key={layerId}>
+                <div className="h-12 flex items-center justify-between px-2 border-b border-line hover:bg-state-hover group">
+                  <span className="text-xs font-medium text-ink-secondary">
+                    {layers[layerId].name}
+                  </span>
+                  {/* 削除ボタン（ホバー時のみ表示、削除可能な場合のみ） */}
+                  {canDeleteLayer(layerId) && (
+                    <button
+                      onClick={() => handleRemoveLayer(layerId)}
+                      className="w-4 h-4 flex items-center justify-center text-ink-muted hover:text-accent-red opacity-0 group-hover:opacity-100 transition-opacity"
+                      title={`${layers[layerId].name}を削除`}
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                {/* VideoレイヤーとSoundレイヤーの間にSound追加ボタン */}
+                {isLastVideo && (
+                  <div className="h-6 border-b border-line flex items-center justify-end px-1 bg-surface-sunken">
+                    <button
+                      onClick={handleAddSoundLayer}
+                      className="w-4 h-4 flex items-center justify-center text-ink-muted hover:text-accent-blue hover:bg-state-hover rounded transition-colors"
+                      title="Soundレイヤーを追加"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
 
         {/* タイムラインスクロールエリア */}
@@ -270,14 +379,25 @@ function Timeline() {
             </div>
 
             {/* レイヤー */}
-            {sortedLayerOrder.map((layerId) => (
-              <Layer
-                key={layerId}
-                layerId={layerId}
-                layer={layers[layerId]}
-                pixelsPerFrame={pixelsPerFrame}
-              />
-            ))}
+            {sortedLayerOrder.map((layerId, index) => {
+              const isVideo = layerId.startsWith('V');
+              const nextLayerId = sortedLayerOrder[index + 1];
+              const isLastVideo = isVideo && (!nextLayerId || nextLayerId.startsWith('S'));
+
+              return (
+                <React.Fragment key={layerId}>
+                  <Layer
+                    layerId={layerId}
+                    layer={layers[layerId]}
+                    pixelsPerFrame={pixelsPerFrame}
+                  />
+                  {/* VideoとSoundの間のスペーサー（追加ボタン行に対応） */}
+                  {isLastVideo && (
+                    <div className="h-6 border-b border-line bg-surface-sunken" />
+                  )}
+                </React.Fragment>
+              );
+            })}
 
             {/* マーキー選択 */}
             <MarqueeSelection

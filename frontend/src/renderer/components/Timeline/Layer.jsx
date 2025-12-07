@@ -2,11 +2,11 @@ import React, { useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useDrop } from 'react-dnd';
 import Clip, { ItemTypes } from './Clip';
-import { moveClip, moveClipToLayer } from '../../store/timelineSlice';
+import { moveClip, moveClipToLayer, duplicateClipToPosition, moveClipsWithDelta, duplicateClipsWithDelta } from '../../store/timelineSlice';
 
 function Layer({ layerId, layer, pixelsPerFrame }) {
   const dispatch = useDispatch();
-  const selectedClipId = useSelector((state) => state.timeline.selectedClipId);
+  const selectedClipIds = useSelector((state) => state.timeline.selectedClipIds);
   const layerRef = useRef(null);
 
   const isVideoLayer = layer.type === 'video';
@@ -23,22 +23,63 @@ function Layer({ layerId, layer, pixelsPerFrame }) {
       const dropX = offset.x - layerRect.left;
       const newStartFrame = Math.max(0, Math.round(dropX / pixelsPerFrame));
 
-      // 同一レイヤー内移動か、レイヤー間移動かを判定
-      if (item.layerId === layerId) {
-        // 同一レイヤー内移動
-        dispatch(moveClip({
-          layerId,
-          clipId: item.id,
-          newStartFrame,
-        }));
-      } else {
-        // レイヤー間移動
-        dispatch(moveClipToLayer({
+      // Altキー状態を確認（グローバル変数から取得）
+      const isAltPressed = window.__isAltPressed || false;
+
+      // 複数選択されている場合
+      const clipIds = item.clipIds || [item.id];
+
+      if (clipIds.length > 1) {
+        // フレーム差分を計算（ドラッグ元の基準クリップからの差分）
+        const deltaFrame = newStartFrame - item.originalStartFrame;
+
+        // clipMoves 配列を構築（各クリップの情報）
+        // 注: 複数選択の場合、各クリップの元レイヤー情報が必要
+        // ここでは簡略化のため、全てドラッグ元と同じレイヤーにあると仮定
+        const clipMoves = clipIds.map(id => ({
           fromLayerId: item.layerId,
-          toLayerId: layerId,
-          clipId: item.id,
-          newStartFrame,
+          clipId: id,
+          originalStartFrame: item.originalStartFrame,
         }));
+
+        if (isAltPressed) {
+          dispatch(duplicateClipsWithDelta({
+            clipMoves,
+            deltaFrame,
+            targetLayerId: layerId,
+          }));
+        } else {
+          dispatch(moveClipsWithDelta({
+            clipMoves,
+            deltaFrame,
+            targetLayerId: layerId,
+          }));
+        }
+      } else {
+        // 単一クリップの処理（既存ロジック）
+        if (isAltPressed) {
+          dispatch(duplicateClipToPosition({
+            fromLayerId: item.layerId,
+            toLayerId: layerId,
+            clipId: item.id,
+            newStartFrame,
+          }));
+        } else {
+          if (item.layerId === layerId) {
+            dispatch(moveClip({
+              layerId,
+              clipId: item.id,
+              newStartFrame,
+            }));
+          } else {
+            dispatch(moveClipToLayer({
+              fromLayerId: item.layerId,
+              toLayerId: layerId,
+              clipId: item.id,
+              newStartFrame,
+            }));
+          }
+        }
       }
     },
     collect: (monitor) => ({
@@ -78,7 +119,7 @@ function Layer({ layerId, layer, pixelsPerFrame }) {
           clip={clip}
           layerId={layerId}
           pixelsPerFrame={pixelsPerFrame}
-          isSelected={clip.id === selectedClipId}
+          isSelected={selectedClipIds.includes(clip.id)}
         />
       ))}
     </div>

@@ -105,7 +105,8 @@ const TextArea = ({ value, onChange, rows = 3, ...props }) => (
 
 const PropertyPanel = () => {
   const dispatch = useDispatch();
-  const { selectedClipId, layers } = useSelector((state) => state.timeline);
+  const { selectedClipIds, layers } = useSelector((state) => state.timeline);
+  const selectedClipId = selectedClipIds?.[0]; // 後方互換
 
   // 選択されたクリップとそのレイヤーを見つける
   const selectedClipInfo = React.useMemo(() => {
@@ -119,6 +120,20 @@ const PropertyPanel = () => {
     }
     return null;
   }, [selectedClipId, layers]);
+
+  // 複数選択時の表示
+  if (selectedClipIds?.length > 1) {
+    return (
+      <div className="h-full bg-surface-raised">
+        <div className="p-4 border-b border-line">
+          <h2 className="text-sm font-semibold text-ink-secondary">プロパティ</h2>
+        </div>
+        <div className="p-4 text-xs text-ink-muted">
+          {selectedClipIds.length}個のクリップを選択中
+        </div>
+      </div>
+    );
+  }
 
   // クリップが選択されていない場合
   if (!selectedClipInfo) {

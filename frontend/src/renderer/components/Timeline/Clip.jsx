@@ -24,8 +24,12 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemTypes.CLIP,
     item: () => {
-      // ドラッグ開始時にクリップを選択
-      dispatch(selectClip({ clipId: clip.id }));
+      // ドラッグ開始時にクリップを選択（選択されていない場合）
+      if (!selectedClipIds.includes(clip.id)) {
+        dispatch(selectClip({ clipId: clip.id }));
+      }
+      // 選択されているクリップ群、または現在のクリップのみを返す
+      const clipIds = selectedClipIds.includes(clip.id) ? selectedClipIds : [clip.id];
       return {
         id: clip.id,
         layerId,
@@ -33,13 +37,17 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
         durationFrames: clip.durationFrames,
         type: clip.type,
         name: clip.name,
+        // 複数選択対応
+        clipIds,
+        originalStartFrame: clip.startFrame,
+        originalLayerId: layerId,
       };
     },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
     canDrag: () => !isResizing, // リサイズ中はドラッグ無効
-  }), [clip, layerId, isResizing, dispatch]);
+  }), [clip, layerId, isResizing, selectedClipIds, dispatch]);
 
   // クリップの幅計算
   const width = clip.durationFrames * pixelsPerFrame;
@@ -128,7 +136,7 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
   return (
     <div
       ref={drag}
-      data-clip="true"
+      data-clip={clip.id}
       className={`
         absolute top-1 bottom-1 rounded
         ${getClipColor(clip.type)}

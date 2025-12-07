@@ -33,7 +33,7 @@ import {
 function App() {
   const dispatch = useDispatch();
   const {
-    selectedClipId,
+    selectedClipIds,
     layers,
     currentFrame,
     totalFrames,
@@ -41,6 +41,7 @@ function App() {
     loopEnabled,
     layerOrder,
   } = useSelector((state) => state.timeline);
+  const selectedClipId = selectedClipIds?.[0]; // 後方互換
 
   const assets = useSelector((state) => state.assets.items);
   const projectName = useSelector(selectProjectName);
@@ -384,6 +385,7 @@ function App() {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [
+    selectedClipIds,
     selectedClipId,
     layers,
     currentFrame,

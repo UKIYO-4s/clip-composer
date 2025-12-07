@@ -21,8 +21,11 @@ const MarqueeSelection = ({ timelineRef, layers, layerOrder, pixelsPerFrame }) =
   const lastUpdateRef = useRef(0);
   const THROTTLE_MS = 50;
 
+  // コールバックをrefで保持（依存関係の問題を回避）
+  const handleMouseDownRef = useRef(null);
+
   // マウスダウン: 選択開始
-  const handleMouseDown = useCallback((e) => {
+  handleMouseDownRef.current = (e) => {
     // クリップ上やルーラー上のクリックは無視
     if (e.target.closest('[data-clip]') || e.target.closest('[data-ruler]')) return;
 
@@ -54,7 +57,7 @@ const MarqueeSelection = ({ timelineRef, layers, layerOrder, pixelsPerFrame }) =
     if (!e.shiftKey) {
       dispatch(clearSelection());
     }
-  }, [timelineRef, dispatch]);
+  };
 
   // マウスムーブ: 選択範囲更新（throttle適用）
   const handleMouseMove = useCallback((e) => {
@@ -130,17 +133,25 @@ const MarqueeSelection = ({ timelineRef, layers, layerOrder, pixelsPerFrame }) =
     setIsSelecting(false);
   }, [isSelecting, startPoint, currentPoint, layers, layerOrder, pixelsPerFrame, isShiftPressed, dispatch]);
 
-  // イベントリスナーの登録
+  // イベントリスナーの登録（安定したラッパー関数を使用）
   useEffect(() => {
     if (!timelineRef.current) return;
 
     const timeline = timelineRef.current;
-    timeline.addEventListener('mousedown', handleMouseDown);
+
+    // 安定したラッパー関数（refを通じて最新のハンドラを呼び出す）
+    const stableHandler = (e) => {
+      if (handleMouseDownRef.current) {
+        handleMouseDownRef.current(e);
+      }
+    };
+
+    timeline.addEventListener('mousedown', stableHandler);
 
     return () => {
-      timeline.removeEventListener('mousedown', handleMouseDown);
+      timeline.removeEventListener('mousedown', stableHandler);
     };
-  }, [timelineRef, handleMouseDown]);
+  }, [timelineRef]);
 
   useEffect(() => {
     if (!isSelecting) return;
