@@ -120,7 +120,7 @@ function TransportControls() {
       <button
         onClick={handleGoToStart}
         className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
-        title="Go to start (Home)"
+        title="先頭へ移動 (Home)"
       >
         <SkipBack className="w-4 h-4" />
       </button>
@@ -129,7 +129,7 @@ function TransportControls() {
       <button
         onClick={handleFrameBackward}
         className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
-        title="Previous frame (←)"
+        title="前のフレーム (←)"
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
@@ -138,7 +138,7 @@ function TransportControls() {
       <button
         onClick={handlePlayPause}
         className="w-10 h-10 flex items-center justify-center rounded bg-accent-blue hover:bg-accent-blue/90 active:bg-accent-blue/80 transition-colors text-white"
-        title="Play/Pause (Space)"
+        title="再生/一時停止 (Space)"
       >
         {isPlaying ? (
           <Pause className="w-5 h-5" />
@@ -151,7 +151,7 @@ function TransportControls() {
       <button
         onClick={handleFrameForward}
         className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
-        title="Next frame (→)"
+        title="次のフレーム (→)"
       >
         <ChevronRight className="w-5 h-5" />
       </button>
@@ -160,7 +160,7 @@ function TransportControls() {
       <button
         onClick={handleGoToEnd}
         className="w-8 h-8 flex items-center justify-center rounded hover:bg-state-hover active:bg-state-active transition-colors text-ink-secondary hover:text-ink-primary"
-        title="Go to end (End)"
+        title="末尾へ移動 (End)"
       >
         <SkipForward className="w-4 h-4" />
       </button>
@@ -176,7 +176,7 @@ function TransportControls() {
             ? 'bg-accent-blue text-white hover:bg-accent-blue/90'
             : 'hover:bg-state-hover text-ink-secondary hover:text-ink-primary'
         }`}
-        title="Toggle loop (L)"
+        title="ループ切り替え (L)"
       >
         <Repeat className="w-4 h-4" />
       </button>
@@ -184,8 +184,8 @@ function TransportControls() {
       {/* 再生情報 */}
       <div className="ml-4 text-xs text-ink-muted">
         {isPlaying && <span className="text-accent-green">● </span>}
-        {isPlaying ? 'Playing' : 'Stopped'}
-        {loopEnabled && <span className="ml-2 text-accent-blue">(Loop)</span>}
+        {isPlaying ? '再生中' : '停止中'}
+        {loopEnabled && <span className="ml-2 text-accent-blue">(ループ)</span>}
       </div>
     </div>
   );

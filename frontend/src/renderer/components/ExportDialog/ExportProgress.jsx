@@ -59,15 +59,15 @@ function ExportProgress({
       {/* 時間情報 */}
       {!isComplete && !isFailed && (
         <div className="flex justify-between text-sm text-ink-muted">
-          <span>Elapsed: {formatTime(elapsedTime)}</span>
-          <span>Remaining: ~{formatTime(estimatedRemaining)}</span>
+          <span>経過時間: {formatTime(elapsedTime)}</span>
+          <span>残り時間: ~{formatTime(estimatedRemaining)}</span>
         </div>
       )}
 
       {/* エラー表示 */}
       {isFailed && (
         <div className="rounded border border-accent-red/50 bg-accent-red/10 p-3 text-sm text-accent-red">
-          <div className="font-semibold mb-1">Export Failed</div>
+          <div className="font-semibold mb-1">エクスポート失敗</div>
           <div>{error}</div>
         </div>
       )}
@@ -75,7 +75,7 @@ function ExportProgress({
       {/* 完了メッセージ */}
       {isComplete && (
         <div className="rounded border border-accent-green/50 bg-accent-green/10 p-3 text-sm text-accent-green">
-          <div className="mb-1 font-semibold">Export Complete!</div>
+          <div className="mb-1 font-semibold">エクスポート完了！</div>
           <div className="truncate text-xs text-accent-green/80">{outputPath}</div>
         </div>
       )}
@@ -89,14 +89,14 @@ function ExportProgress({
               size="md"
               onClick={onCancel}
             >
-              Close
+              閉じる
             </Button>
             <Button
               variant="primary"
               size="md"
               onClick={handleOpenFolder}
             >
-              Show in Folder
+              フォルダで表示
             </Button>
           </>
         ) : (
@@ -106,7 +106,7 @@ function ExportProgress({
             onClick={onCancel}
             disabled={isFailed}
           >
-            {isFailed ? 'Close' : 'Cancel'}
+            {isFailed ? '閉じる' : 'キャンセル'}
           </Button>
         )}
       </div>

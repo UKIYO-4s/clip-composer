@@ -165,7 +165,7 @@ function AssetPanel() {
   }, [dispatch]);
 
   const filterButtons = [
-    { value: 'all', label: 'All', icon: null },
+    { value: 'all', label: 'すべて', icon: null },
     { value: 'video', label: null, icon: Film },
     { value: 'image', label: null, icon: Image },
     { value: 'audio', label: null, icon: Music },
@@ -183,21 +183,21 @@ function AssetPanel() {
       {/* ヘッダー */}
       <div className="p-3 border-b border-line">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-ink-secondary">Assets</h2>
+          <h2 className="text-sm font-semibold text-ink-secondary">アセット</h2>
           <Button
             variant="primary"
             size="sm"
             onClick={handleImportClick}
           >
             <Plus className="w-3 h-3" />
-            Import
+            インポート
           </Button>
         </div>
 
         {/* 検索 */}
         <Input
           type="text"
-          placeholder="Search..."
+          placeholder="検索..."
           value={searchQuery}
           onChange={(e) => dispatch(setSearchQuery(e.target.value))}
           className="w-full"
@@ -240,7 +240,7 @@ function AssetPanel() {
           <div className="text-center py-8 text-ink-muted text-sm">
             <FolderOpen className="w-8 h-8 mx-auto mb-2" />
             <div>ファイルをドロップ</div>
-            <div>または Import ボタン</div>
+            <div>または インポート ボタン</div>
           </div>
         ) : (
           assets.map((asset) => (

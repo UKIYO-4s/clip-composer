@@ -139,7 +139,7 @@ const PropertyPanel = () => {
   return (
     <div className="h-full bg-surface-raised overflow-y-auto">
       <div className="p-4 border-b border-line">
-        <h2 className="text-sm font-semibold text-ink-secondary">Properties</h2>
+        <h2 className="text-sm font-semibold text-ink-secondary">プロパティ</h2>
       </div>
 
       {/* 共通プロパティ */}

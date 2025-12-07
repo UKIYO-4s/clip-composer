@@ -155,12 +155,12 @@ function Timeline() {
 
       {/* ヘッダー: タイムコード表示 */}
       <div className="flex items-center h-8 bg-surface-raised border-b border-line px-4">
-        <div className="w-20 text-sm text-ink-secondary">Time:</div>
+        <div className="w-20 text-sm text-ink-secondary">時間:</div>
         <div className="font-mono text-sm text-ink-primary">
           {frameToTimecode(currentFrame)}
         </div>
         <div className="ml-4 text-xs text-ink-secondary">
-          Frame: {currentFrame} / {totalFrames}
+          フレーム: {currentFrame} / {totalFrames}
         </div>
       </div>
 

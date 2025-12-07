@@ -97,11 +97,11 @@ function App() {
         console.log('Project saved successfully:', savePath);
       } else {
         console.error('Failed to save project:', saveResult.error);
-        alert('Failed to save project: ' + saveResult.error);
+        alert('プロジェクトの保存に失敗しました: ' + saveResult.error);
       }
     } catch (error) {
       console.error('Error saving project:', error);
-      alert('Error saving project: ' + error.message);
+      alert('プロジェクト保存エラー: ' + error.message);
     }
   }, [dispatch, projectPath, projectName, layers, layerOrder, totalFrames, assets]);
 
@@ -147,11 +147,11 @@ function App() {
         console.log('Project saved as:', savePath);
       } else {
         console.error('Failed to save project:', saveResult.error);
-        alert('Failed to save project: ' + saveResult.error);
+        alert('プロジェクトの保存に失敗しました: ' + saveResult.error);
       }
     } catch (error) {
       console.error('Error saving project:', error);
-      alert('Error saving project: ' + error.message);
+      alert('プロジェクト保存エラー: ' + error.message);
     }
   }, [dispatch, projectName, layers, layerOrder, totalFrames, assets]);
 
@@ -160,7 +160,7 @@ function App() {
     try {
       // 未保存の変更がある場合は確認
       if (isDirty) {
-        const confirmed = window.confirm('You have unsaved changes. Do you want to continue?');
+        const confirmed = window.confirm('保存されていない変更があります。続行しますか？');
         if (!confirmed) {
           return;
         }
@@ -183,7 +183,7 @@ function App() {
 
       if (!loadResult.success) {
         console.error('Failed to load project:', loadResult.error);
-        alert('Failed to load project: ' + loadResult.error);
+        alert('プロジェクトの読み込みに失敗しました: ' + loadResult.error);
         return;
       }
 
@@ -203,10 +203,10 @@ function App() {
       }));
       dispatch(addRecentFile(loadPath));
 
-      alert('Project loaded successfully! (Note: Full state restoration not yet implemented)');
+      alert('プロジェクトを読み込みました！（注: 完全な状態復元は未実装です）');
     } catch (error) {
       console.error('Error loading project:', error);
-      alert('Error loading project: ' + error.message);
+      alert('プロジェクト読み込みエラー: ' + error.message);
     }
   }, [dispatch, isDirty]);
 
@@ -214,7 +214,7 @@ function App() {
   const handleNewProject = useCallback(() => {
     // 未保存の変更がある場合は確認
     if (isDirty) {
-      const confirmed = window.confirm('You have unsaved changes. Do you want to continue?');
+      const confirmed = window.confirm('保存されていない変更があります。続行しますか？');
       if (!confirmed) {
         return;
       }
@@ -426,7 +426,7 @@ function App() {
               size="md"
               onClick={handleOpenExport}
             >
-              Export
+              エクスポート
             </Button>
           </div>
         </header>

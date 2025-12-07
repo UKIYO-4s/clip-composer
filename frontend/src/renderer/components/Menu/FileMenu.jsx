@@ -95,7 +95,7 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
         onClick={handleMenuClick}
         className="px-3 py-1 hover:bg-state-hover rounded text-sm font-medium transition-colors text-ink-primary"
       >
-        File
+        ファイル
       </button>
 
       {/* Dropdown menu */}
@@ -107,7 +107,7 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
             className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
           >
             <FilePlus className="w-4 h-4 text-ink-muted" />
-            <span className="flex-1">New Project</span>
+            <span className="flex-1">新規プロジェクト</span>
             <span className="text-xs text-ink-muted">Ctrl+N</span>
           </button>
 
@@ -117,7 +117,7 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
             className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
           >
             <FolderOpen className="w-4 h-4 text-ink-muted" />
-            <span className="flex-1">Open Project</span>
+            <span className="flex-1">プロジェクトを開く</span>
             <span className="text-xs text-ink-muted">Ctrl+O</span>
           </button>
 
@@ -129,7 +129,7 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
             className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
           >
             <Save className="w-4 h-4 text-ink-muted" />
-            <span className="flex-1">Save{isDirty ? ' *' : ''}</span>
+            <span className="flex-1">保存{isDirty ? ' *' : ''}</span>
             <span className="text-xs text-ink-muted">Ctrl+S</span>
           </button>
 
@@ -139,7 +139,7 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
             className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
           >
             <Save className="w-4 h-4 text-ink-muted" />
-            <span className="flex-1">Save As...</span>
+            <span className="flex-1">名前を付けて保存...</span>
             <span className="text-xs text-ink-muted">Ctrl+Shift+S</span>
           </button>
 
@@ -153,7 +153,7 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
                   className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
                 >
                   <Clock className="w-4 h-4 text-ink-muted" />
-                  <span className="flex-1">Recent Files</span>
+                  <span className="flex-1">最近使用したファイル</span>
                   <ChevronRight className="w-4 h-4 text-ink-muted" />
                 </button>
 

@@ -89,7 +89,7 @@ function ExportDialog() {
 
         dispatch(updateProgress({
           progress: data.progress,
-          message: data.message || 'Rendering...',
+          message: data.message || 'レンダリング中...',
           elapsedTime: elapsed,
           estimatedRemaining: remaining,
         }));
@@ -103,7 +103,7 @@ function ExportDialog() {
       if (result.success) {
         dispatch(exportSuccess());
       } else {
-        dispatch(exportError(result.error || 'Unknown error'));
+        dispatch(exportError(result.error || '不明なエラー'));
       }
     } catch (err) {
       dispatch(exportError(err.message));
@@ -133,7 +133,7 @@ function ExportDialog() {
       <div className="w-full max-w-md rounded-lg border border-line bg-surface-raised shadow-xl">
         {/* ヘッダー */}
         <div className="flex items-center justify-between border-b border-line p-4">
-          <h2 className="text-lg font-semibold text-white">Export Video</h2>
+          <h2 className="text-lg font-semibold text-white">動画をエクスポート</h2>
           <IconButton
             variant="ghost"
             onClick={handleCancel}
@@ -159,14 +159,14 @@ function ExportDialog() {
             <>
               {/* 解像度 */}
               <Select
-                label="Resolution"
+                label="解像度"
                 value={settings.resolution}
                 onChange={(e) => handleSettingChange('resolution', e.target.value)}
                 options={[
                   { value: '1080p', label: '1080p (1920 x 1080)' },
                   { value: '720p', label: '720p (1280 x 720)' },
                   { value: '480p', label: '480p (854 x 480)' },
-                  { value: 'custom', label: 'Custom' },
+                  { value: 'custom', label: 'カスタム' },
                 ]}
                 className="w-full"
               />
@@ -176,14 +176,14 @@ function ExportDialog() {
                 <div className="flex gap-2">
                   <Input
                     type="number"
-                    label="Width"
+                    label="幅"
                     value={settings.customWidth}
                     onChange={(e) => handleSettingChange('customWidth', parseInt(e.target.value))}
                     className="flex-1"
                   />
                   <Input
                     type="number"
-                    label="Height"
+                    label="高さ"
                     value={settings.customHeight}
                     onChange={(e) => handleSettingChange('customHeight', parseInt(e.target.value))}
                     className="flex-1"
@@ -193,7 +193,7 @@ function ExportDialog() {
 
               {/* フレームレート */}
               <Select
-                label="Frame Rate"
+                label="フレームレート"
                 value={settings.fps}
                 onChange={(e) => handleSettingChange('fps', parseInt(e.target.value))}
                 options={[
@@ -206,25 +206,25 @@ function ExportDialog() {
 
               {/* 品質 */}
               <Select
-                label="Quality"
+                label="品質"
                 value={settings.quality}
                 onChange={(e) => handleSettingChange('quality', e.target.value)}
                 options={[
-                  { value: 'high', label: 'High (slower)' },
-                  { value: 'medium', label: 'Medium' },
-                  { value: 'low', label: 'Low (faster)' },
+                  { value: 'high', label: '高（低速）' },
+                  { value: 'medium', label: '中' },
+                  { value: 'low', label: '低（高速）' },
                 ]}
                 className="w-full"
               />
 
               {/* 出力先 */}
               <div>
-                <label className="mb-1 block text-sm text-ink-secondary">Output</label>
+                <label className="mb-1 block text-sm text-ink-secondary">出力先</label>
                 <div className="flex gap-2">
                   <Input
                     type="text"
                     value={outputPath}
-                    placeholder="Select output file..."
+                    placeholder="出力ファイルを選択..."
                     readOnly
                     className="flex-1"
                   />
@@ -233,7 +233,7 @@ function ExportDialog() {
                     size="md"
                     onClick={handleSelectOutput}
                   >
-                    Browse
+                    参照
                   </Button>
                 </div>
               </div>
@@ -256,7 +256,7 @@ function ExportDialog() {
               size="md"
               onClick={handleCancel}
             >
-              Cancel
+              キャンセル
             </Button>
             <Button
               variant="primary"
@@ -264,7 +264,7 @@ function ExportDialog() {
               onClick={handleStartExport}
               disabled={!outputPath}
             >
-              Export
+              エクスポート
             </Button>
           </div>
         )}
