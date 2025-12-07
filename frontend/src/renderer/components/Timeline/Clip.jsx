@@ -51,12 +51,13 @@ const Clip = ({ clip, layerId, pixelsPerFrame, isSelected = false }) => {
   // クリップタイプごとの色分け
   const getClipColor = (type) => {
     const colorMap = {
-      video: 'bg-clip-video',
-      text: 'bg-clip-text',
-      image: 'bg-clip-image',
-      bgm: 'bg-clip-audio',
-      se: 'bg-clip-se',
-      adjustment: 'bg-clip-adjust',
+      video: 'bg-track-video',
+      text: 'bg-track-text',
+      image: 'bg-track-image',
+      bgm: 'bg-track-audio',
+      audio: 'bg-track-audio',
+      se: 'bg-track-se',
+      adjustment: 'bg-track-adjust',
     };
     return colorMap[type] || 'bg-surface-raised';
   };

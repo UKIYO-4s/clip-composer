@@ -40,7 +40,7 @@ export default {
         hover: 'rgba(255,255,255,0.04)',
         active: 'rgba(255,255,255,0.08)',
       },
-      clip: {
+      track: {
         video: '#1d7fcc',
         text: '#d4952a',   // 明るいアンバー（視認性向上）
         image: '#2ba88a',

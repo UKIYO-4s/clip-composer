@@ -17,12 +17,12 @@ const ClipDemo = ({
   width = 180,
 }) => {
   const colorMap = {
-    video: 'bg-clip-video',
-    text: 'bg-clip-text',
-    image: 'bg-clip-image',
-    audio: 'bg-clip-audio',
-    se: 'bg-clip-se',
-    adjust: 'bg-clip-adjust',
+    video: 'bg-track-video',
+    text: 'bg-track-text',
+    image: 'bg-track-image',
+    audio: 'bg-track-audio',
+    se: 'bg-track-se',
+    adjust: 'bg-track-adjust',
   };
 
   return (

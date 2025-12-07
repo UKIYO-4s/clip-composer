@@ -48,18 +48,24 @@
 }
 
 @layer components {
-  /* Clip colors - 100%不透明で視認性確保 */
-  .clip-video {
-    @apply bg-clip-video border-clip-video;
+  /* Track colors - クリップタイプ別の色 */
+  .track-video {
+    @apply bg-track-video border-track-video;
   }
-  .clip-text {
-    @apply bg-clip-text border-clip-text;
+  .track-text {
+    @apply bg-track-text border-track-text;
   }
-  .clip-image {
-    @apply bg-clip-image border-clip-image;
+  .track-image {
+    @apply bg-track-image border-track-image;
   }
-  .clip-audio {
-    @apply bg-clip-audio border-clip-audio;
+  .track-audio {
+    @apply bg-track-audio border-track-audio;
+  }
+  .track-se {
+    @apply bg-track-se border-track-se;
+  }
+  .track-adjust {
+    @apply bg-track-adjust border-track-adjust;
   }
 }
 

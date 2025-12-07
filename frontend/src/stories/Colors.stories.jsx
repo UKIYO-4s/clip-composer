@@ -77,7 +77,7 @@ export const AllColors = () => (
     />
 
     <ColorGroup
-      title="Clip Types"
+      title="Track Types"
       colors={[
         { name: 'video', value: '#1d7fcc' },
         { name: 'text', value: '#d4952a' },
@@ -148,26 +148,26 @@ export const AccentColors = () => (
   </div>
 );
 
-export const ClipColors = () => (
+export const TrackColors = () => (
   <div className="p-6 bg-surface-base">
-    <h2 className="text-xl font-bold text-ink-primary mb-6">Clip Type Colors</h2>
+    <h2 className="text-xl font-bold text-ink-primary mb-6">Track Type Colors</h2>
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-      <div className="p-4 bg-clip-video rounded text-white text-center font-medium">
+      <div className="p-4 bg-track-video rounded text-white text-center font-medium">
         video: #1d7fcc
       </div>
-      <div className="p-4 bg-clip-text rounded text-white text-center font-medium">
+      <div className="p-4 bg-track-text rounded text-white text-center font-medium">
         text: #d4952a
       </div>
-      <div className="p-4 bg-clip-image rounded text-white text-center font-medium">
+      <div className="p-4 bg-track-image rounded text-white text-center font-medium">
         image: #2ba88a
       </div>
-      <div className="p-4 bg-clip-audio rounded text-white text-center font-medium">
+      <div className="p-4 bg-track-audio rounded text-white text-center font-medium">
         audio: #3d5fb8
       </div>
-      <div className="p-4 bg-clip-se rounded text-white text-center font-medium">
+      <div className="p-4 bg-track-se rounded text-white text-center font-medium">
         se: #2e8da8
       </div>
-      <div className="p-4 bg-clip-adjust rounded text-white text-center font-medium">
+      <div className="p-4 bg-track-adjust rounded text-white text-center font-medium">
         adjust: #9b4fd6
       </div>
     </div>
