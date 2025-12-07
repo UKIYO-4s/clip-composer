@@ -80,7 +80,7 @@ export const AllColors = () => (
       title="Clip Types"
       colors={[
         { name: 'video', value: '#1d7fcc' },
-        { name: 'text', value: '#b5851f' },
+        { name: 'text', value: '#d4952a' },
         { name: 'image', value: '#2ba88a' },
         { name: 'audio', value: '#3d5fb8' },
         { name: 'se', value: '#2e8da8' },
@@ -156,7 +156,7 @@ export const ClipColors = () => (
         video: #1d7fcc
       </div>
       <div className="p-4 bg-clip-text rounded text-white text-center font-medium">
-        text: #b5851f
+        text: #d4952a
       </div>
       <div className="p-4 bg-clip-image rounded text-white text-center font-medium">
         image: #2ba88a

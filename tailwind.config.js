@@ -42,10 +42,10 @@ export default {
       },
       clip: {
         video: '#1d7fcc',
-        text: '#b5851f',
+        text: '#d4952a',   // 明るいアンバー（視認性向上）
         image: '#2ba88a',
-        audio: '#3d5fb8',  // -10% brightness from #4c74d4
-        se: '#2e8da8',     // -10% brightness from #3ba8c4
+        audio: '#3d5fb8',
+        se: '#2e8da8',
         adjust: '#9b4fd6',
       },
     },
