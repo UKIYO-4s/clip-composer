@@ -89,6 +89,75 @@ const sampleClips = {
   ],
 };
 
+/**
+ * クリップの重複を処理する
+ * @param {Array} clips - レイヤー内の全クリップ配列
+ * @param {Object} newClip - 新しく配置/移動されるクリップ
+ * @returns {Array} 処理後のクリップ配列
+ */
+const handleClipOverlap = (clips, newClip) => {
+  const newStart = newClip.startFrame;
+  const newEnd = newClip.startFrame + newClip.durationFrames;
+  const result = [];
+
+  for (const clip of clips) {
+    // 自分自身はスキップ
+    if (clip.id === newClip.id) continue;
+
+    const clipStart = clip.startFrame;
+    const clipEnd = clip.startFrame + clip.durationFrames;
+
+    // 重なりなし
+    if (clipEnd <= newStart || clipStart >= newEnd) {
+      result.push(clip);
+      continue;
+    }
+
+    // ケース4: 完全に含まれる → 削除（pushしない）
+    if (clipStart >= newStart && clipEnd <= newEnd) {
+      continue;
+    }
+
+    // ケース1: 完全に覆う → 分割
+    if (clipStart < newStart && clipEnd > newEnd) {
+      // 前半部分
+      result.push({
+        ...clip,
+        durationFrames: newStart - clipStart,
+      });
+      // 後半部分（新しいIDで）
+      result.push({
+        ...clip,
+        id: `${clip.id}-split-${Date.now()}`,
+        startFrame: newEnd,
+        durationFrames: clipEnd - newEnd,
+      });
+      continue;
+    }
+
+    // ケース2: 左側が重なる → 右側トリム
+    if (clipStart < newStart && clipEnd > newStart) {
+      result.push({
+        ...clip,
+        durationFrames: newStart - clipStart,
+      });
+      continue;
+    }
+
+    // ケース3: 右側が重なる → 左側トリム
+    if (clipStart < newEnd && clipEnd > newEnd) {
+      result.push({
+        ...clip,
+        startFrame: newEnd,
+        durationFrames: clipEnd - newEnd,
+      });
+      continue;
+    }
+  }
+
+  return result;
+};
+
 const initialState = {
   layers: {
     V2: { id: 'V2', name: 'Video 2', type: 'video', clips: sampleClips.V2 },
@@ -116,7 +185,19 @@ const timelineSlice = createSlice({
     },
     addClip: (state, action) => {
       const { layerId, clip } = action.payload;
-      state.layers[layerId].clips.push(clip);
+      const layer = state.layers[layerId];
+
+      // 重複処理
+      const otherClips = handleClipOverlap(layer.clips, clip);
+
+      // 削除されたクリップIDを選択から除外
+      const removedClipIds = layer.clips
+        .filter(c => !otherClips.find(oc => oc.id === c.id))
+        .map(c => c.id);
+      state.selectedClipIds = state.selectedClipIds.filter(id => !removedClipIds.includes(id));
+
+      // クリップ配列を更新
+      layer.clips = [...otherClips, clip];
     },
     removeClip: (state, action) => {
       const { layerId, clipId } = action.payload;
@@ -323,12 +404,23 @@ const timelineSlice = createSlice({
         startFrame: Math.max(0, newStartFrame),
       };
 
-      toLayer.clips.push(duplicatedClip);
+      // 重複処理
+      const otherClips = handleClipOverlap(toLayer.clips, duplicatedClip);
+
+      // 削除されたクリップIDを選択から除外
+      const removedClipIds = toLayer.clips
+        .filter(c => !otherClips.find(oc => oc.id === c.id))
+        .map(c => c.id);
+      state.selectedClipIds = state.selectedClipIds.filter(id => !removedClipIds.includes(id));
+
+      // クリップ配列を更新
+      toLayer.clips = [...otherClips, duplicatedClip];
     },
     // Option+ドラッグ: 複数クリップを指定位置に複製
     duplicateClipsToPosition: (state, action) => {
       const { clips, toLayerId, frameOffset } = action.payload;
       const toLayer = state.layers[toLayerId];
+      let currentClips = [...toLayer.clips];
 
       clips.forEach(({ fromLayerId, clipId, originalStartFrame }) => {
         const fromLayer = state.layers[fromLayerId];
@@ -341,16 +433,43 @@ const timelineSlice = createSlice({
           startFrame: Math.max(0, originalStartFrame + frameOffset),
         };
 
-        toLayer.clips.push(duplicatedClip);
+        // 重複処理
+        currentClips = handleClipOverlap(currentClips, duplicatedClip);
+
+        // 削除されたクリップIDを選択から除外
+        const removedClipIds = toLayer.clips
+          .filter(c => !currentClips.find(oc => oc.id === c.id))
+          .map(c => c.id);
+        state.selectedClipIds = state.selectedClipIds.filter(id => !removedClipIds.includes(id));
+
+        // クリップを追加
+        currentClips.push(duplicatedClip);
       });
+
+      // レイヤーを更新
+      toLayer.clips = currentClips;
     },
     // ドラッグ&ドロップ: 同一レイヤー内での移動
     moveClip: (state, action) => {
       const { layerId, clipId, newStartFrame } = action.payload;
-      const clip = state.layers[layerId].clips.find((c) => c.id === clipId);
-      if (clip) {
-        clip.startFrame = Math.max(0, newStartFrame);
-      }
+      const layer = state.layers[layerId];
+      const clip = layer.clips.find((c) => c.id === clipId);
+      if (!clip) return;
+
+      // 新しい位置でのクリップ情報
+      const movedClip = { ...clip, startFrame: Math.max(0, newStartFrame) };
+
+      // 重複処理
+      const otherClips = handleClipOverlap(layer.clips, movedClip);
+
+      // 削除されたクリップIDを選択から除外
+      const removedClipIds = layer.clips
+        .filter(c => c.id !== clipId && !otherClips.find(oc => oc.id === c.id))
+        .map(c => c.id);
+      state.selectedClipIds = state.selectedClipIds.filter(id => !removedClipIds.includes(id));
+
+      // クリップ配列を更新
+      layer.clips = [...otherClips, movedClip];
     },
     // ドラッグ&ドロップ: レイヤー間移動
     moveClipToLayer: (state, action) => {
@@ -368,40 +487,25 @@ const timelineSlice = createSlice({
       // 新しい位置を設定
       clip.startFrame = Math.max(0, newStartFrame);
 
-      // 移動先レイヤーに追加
-      toLayer.clips.push(clip);
+      // 移動先レイヤーで重複処理
+      const otherClips = handleClipOverlap(toLayer.clips, clip);
+
+      // 削除されたクリップIDを選択から除外
+      const removedClipIds = toLayer.clips
+        .filter(c => !otherClips.find(oc => oc.id === c.id))
+        .map(c => c.id);
+      state.selectedClipIds = state.selectedClipIds.filter(id => !removedClipIds.includes(id));
+
+      // クリップ配列を更新
+      toLayer.clips = [...otherClips, clip];
     },
-    // 複数クリップ移動（フレーム差分ベース）
+    // 複数クリップ移動(フレーム差分ベース)
     moveClipsWithDelta: (state, action) => {
       const { clipMoves, deltaFrame, targetLayerId } = action.payload;
       // clipMoves: [{ fromLayerId, clipId, originalStartFrame }]
 
-      clipMoves.forEach(({ fromLayerId, clipId, originalStartFrame }) => {
-        const fromLayer = state.layers[fromLayerId];
-        if (!fromLayer) return;
-
-        const clipIndex = fromLayer.clips.findIndex(c => c.id === clipId);
-        if (clipIndex === -1) return;
-
-        const clip = fromLayer.clips[clipIndex];
-        const newStartFrame = Math.max(0, originalStartFrame + deltaFrame);
-
-        if (targetLayerId && targetLayerId !== fromLayerId) {
-          // レイヤー間移動
-          fromLayer.clips.splice(clipIndex, 1);
-          clip.startFrame = newStartFrame;
-          state.layers[targetLayerId].clips.push(clip);
-        } else {
-          // 同一レイヤー内移動
-          clip.startFrame = newStartFrame;
-        }
-      });
-    },
-    // 複数クリップ複製（フレーム差分ベース）
-    duplicateClipsWithDelta: (state, action) => {
-      const { clipMoves, deltaFrame, targetLayerId } = action.payload;
-      // clipMoves: [{ fromLayerId, clipId, originalStartFrame }]
-
+      // 移動するクリップを収集
+      const clipsToMove = [];
       clipMoves.forEach(({ fromLayerId, clipId, originalStartFrame }) => {
         const fromLayer = state.layers[fromLayerId];
         if (!fromLayer) return;
@@ -409,16 +513,119 @@ const timelineSlice = createSlice({
         const clip = fromLayer.clips.find(c => c.id === clipId);
         if (!clip) return;
 
-        const newStartFrame = Math.max(0, originalStartFrame + deltaFrame);
+        clipsToMove.push({
+          clip,
+          fromLayerId,
+          newStartFrame: Math.max(0, originalStartFrame + deltaFrame),
+        });
+      });
+
+      // レイヤーごとにグループ化して処理
+      const layerGroups = {};
+      clipsToMove.forEach(({ clip, fromLayerId, newStartFrame }) => {
         const destLayerId = targetLayerId || fromLayerId;
+        if (!layerGroups[destLayerId]) {
+          layerGroups[destLayerId] = [];
+        }
+        layerGroups[destLayerId].push({ clip, fromLayerId, newStartFrame });
+      });
 
-        const newClip = {
-          ...clip,
-          id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}-${clipId.slice(-4)}`,
-          startFrame: newStartFrame,
-        };
+      // 各レイヤーで重複処理
+      Object.entries(layerGroups).forEach(([destLayerId, moves]) => {
+        const destLayer = state.layers[destLayerId];
+        let currentClips = [...destLayer.clips];
 
-        state.layers[destLayerId].clips.push(newClip);
+        // 移動元から削除（レイヤー間移動の場合）
+        moves.forEach(({ clip, fromLayerId }) => {
+          if (fromLayerId !== destLayerId) {
+            const fromLayer = state.layers[fromLayerId];
+            fromLayer.clips = fromLayer.clips.filter(c => c.id !== clip.id);
+          } else {
+            // 同一レイヤー内移動の場合は一旦除外
+            currentClips = currentClips.filter(c => c.id !== clip.id);
+          }
+        });
+
+        // 各クリップを新しい位置に配置
+        moves.forEach(({ clip, newStartFrame }) => {
+          const movedClip = { ...clip, startFrame: newStartFrame };
+
+          // 重複処理
+          currentClips = handleClipOverlap(currentClips, movedClip);
+
+          // 削除されたクリップIDを選択から除外
+          const removedClipIds = destLayer.clips
+            .filter(c => c.id !== movedClip.id && !currentClips.find(oc => oc.id === c.id))
+            .map(c => c.id);
+          state.selectedClipIds = state.selectedClipIds.filter(id => !removedClipIds.includes(id));
+
+          // クリップを追加
+          currentClips.push(movedClip);
+        });
+
+        // レイヤーを更新
+        destLayer.clips = currentClips;
+      });
+    },
+    // 複数クリップ複製（フレーム差分ベース）
+    duplicateClipsWithDelta: (state, action) => {
+      const { clipMoves, deltaFrame, targetLayerId } = action.payload;
+      // clipMoves: [{ fromLayerId, clipId, originalStartFrame }]
+
+      // 複製するクリップを収集
+      const clipsToDuplicate = [];
+      clipMoves.forEach(({ fromLayerId, clipId, originalStartFrame }) => {
+        const fromLayer = state.layers[fromLayerId];
+        if (!fromLayer) return;
+
+        const clip = fromLayer.clips.find(c => c.id === clipId);
+        if (!clip) return;
+
+        clipsToDuplicate.push({
+          clip,
+          fromLayerId,
+          newStartFrame: Math.max(0, originalStartFrame + deltaFrame),
+        });
+      });
+
+      // レイヤーごとにグループ化して処理
+      const layerGroups = {};
+      clipsToDuplicate.forEach(({ clip, fromLayerId, newStartFrame }) => {
+        const destLayerId = targetLayerId || fromLayerId;
+        if (!layerGroups[destLayerId]) {
+          layerGroups[destLayerId] = [];
+        }
+        layerGroups[destLayerId].push({ clip, newStartFrame });
+      });
+
+      // 各レイヤーで重複処理
+      Object.entries(layerGroups).forEach(([destLayerId, duplicates]) => {
+        const destLayer = state.layers[destLayerId];
+        let currentClips = [...destLayer.clips];
+
+        // 各クリップを複製して配置
+        duplicates.forEach(({ clip, newStartFrame }) => {
+          const duplicatedClip = {
+            ...clip,
+            id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}-${clip.id.slice(-4)}`,
+            startFrame: newStartFrame,
+          };
+
+          // 重複処理
+          currentClips = handleClipOverlap(currentClips, duplicatedClip);
+
+          // 削除されたクリップIDを選択から除外
+          const removedClipIds = destLayer.clips
+            .filter(c => !currentClips.find(oc => oc.id === c.id))
+            .map(c => c.id);
+          state.selectedClipIds = state.selectedClipIds.filter(id => !removedClipIds.includes(id));
+
+          // クリップを追加
+          currentClips.push(duplicatedClip);
+        });
+
+        // レイヤーを更新
+        destLayer.clips = currentClips;
       });
     },
     // 再生コントロール

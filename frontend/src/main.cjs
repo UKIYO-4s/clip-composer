@@ -282,6 +282,57 @@ ipcMain.handle('select-folder', async () => {
   return { canceled: false, folderPath: result.filePaths[0] };
 });
 
+// フォルダ内のファイル一覧取得
+ipcMain.handle('list-folder-files', async (event, { folderPath, extensions }) => {
+  const fs = require('fs').promises;
+  const path = require('path');
+
+  const MAX_FILES = 500;
+  const allowedExtensions = extensions || ['.mp4', '.mov', '.avi', '.webm', '.mkv'];
+
+  try {
+    // パス正規化（セキュリティ）
+    const realPath = await fs.realpath(folderPath);
+
+    // ディレクトリか確認
+    const stat = await fs.stat(realPath);
+    if (!stat.isDirectory()) {
+      return { ok: false, code: 'ENOTDIR', message: 'フォルダではありません' };
+    }
+
+    // ファイル一覧取得（withFileTypesで効率化）
+    const entries = await fs.readdir(realPath, { withFileTypes: true });
+
+    // フィルタリング
+    const filteredFiles = entries
+      .filter(entry => {
+        if (!entry.isFile()) return false;
+        const ext = path.extname(entry.name).toLowerCase();
+        return allowedExtensions.includes(ext);
+      })
+      .map(entry => ({
+        name: entry.name,
+        path: path.join(realPath, entry.name),
+      }));
+
+    const totalCount = filteredFiles.length;
+    const files = filteredFiles.slice(0, MAX_FILES);
+
+    return { ok: true, files, totalCount };
+
+  } catch (error) {
+    const messages = {
+      EACCES: 'アクセス権限がありません',
+      ENOENT: 'フォルダが見つかりません',
+    };
+    return {
+      ok: false,
+      code: error.code || 'UNKNOWN',
+      message: messages[error.code] || error.message,
+    };
+  }
+});
+
 // 保存先選択ダイアログ
 ipcMain.handle('save-file', async (event, options = {}) => {
   const result = await dialog.showSaveDialog(mainWindow, {

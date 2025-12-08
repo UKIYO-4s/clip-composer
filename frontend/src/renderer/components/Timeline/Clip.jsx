@@ -15,6 +15,7 @@ export const ItemTypes = {
 const Clip = ({ clip, layerId, pixelsPerFrame }) => {
   const dispatch = useDispatch();
   const selectedClipIds = useSelector((state) => state.timeline.selectedClipIds);
+  const layers = useSelector((state) => state.timeline.layers);
   const isSelected = selectedClipIds.includes(clip.id);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeType, setResizeType] = useState(null); // 'start' or 'end'
@@ -30,6 +31,21 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
       }
       // 選択されているクリップ群、または現在のクリップのみを返す
       const clipIds = selectedClipIds.includes(clip.id) ? selectedClipIds : [clip.id];
+
+      // 選択された全クリップの情報を収集（複数クリップ移動/複製用）
+      const selectedClipsInfo = [];
+      for (const lid of Object.keys(layers)) {
+        for (const c of layers[lid].clips) {
+          if (clipIds.includes(c.id)) {
+            selectedClipsInfo.push({
+              clipId: c.id,
+              layerId: lid,
+              startFrame: c.startFrame,
+            });
+          }
+        }
+      }
+
       return {
         id: clip.id,
         layerId,
@@ -41,13 +57,15 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
         clipIds,
         originalStartFrame: clip.startFrame,
         originalLayerId: layerId,
+        // 各クリップの詳細情報
+        selectedClipsInfo,
       };
     },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
     canDrag: () => !isResizing, // リサイズ中はドラッグ無効
-  }), [clip, layerId, isResizing, selectedClipIds, dispatch]);
+  }), [clip, layerId, isResizing, selectedClipIds, layers, dispatch]);
 
   // クリップの幅計算
   const width = clip.durationFrames * pixelsPerFrame;

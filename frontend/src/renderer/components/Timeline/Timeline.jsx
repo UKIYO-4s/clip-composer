@@ -250,6 +250,8 @@ function Timeline() {
   const handleBackgroundClick = useCallback((e) => {
     // クリップやルーラー上のクリックは無視
     if (e.target.closest('[data-clip]') || e.target.closest('[data-ruler]')) return;
+    // マーキー選択直後は選択解除をスキップ
+    if (window.__justFinishedMarquee) return;
     dispatch(clearSelection());
   }, [dispatch]);
 

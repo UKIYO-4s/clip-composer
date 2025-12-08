@@ -6,6 +6,8 @@ import { X } from '../../../Icons';
 import InputModeSelector from './InputModeSelector';
 import SelectionModeSelect from './SelectionModeHelp';
 import { useClipCalculation } from '../../../../hooks/useClipCalculation';
+import { useFolderSelection } from '../../../../hooks';
+import { FolderSelector } from '../../../FolderSelector';
 
 const generateId = () => `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -33,7 +35,18 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const [customStartFrame, setCustomStartFrame] = useState(0);
   const [placementMode, setPlacementMode] = useState('continuous');
   const [gapFrames, setGapFrames] = useState(0);
-  const [folderPath, setFolderPath] = useState('');
+
+  // フォルダ選択フック
+  const {
+    folderPath,
+    files: videoFiles,
+    totalCount: videoFileCount,
+    isLoading: isLoadingFiles,
+    error: fileError,
+    selectFolder: handleSelectFolder,
+  } = useFolderSelection({
+    extensions: ['.mp4', '.mov', '.avi', '.webm', '.mkv'],
+  });
 
   // クリップ計算フック使用
   const calculated = useClipCalculation({
@@ -93,6 +106,11 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
 
   // 一括配置実行
   const handleBulkPlace = useCallback(() => {
+    if (!folderPath) {
+      // フォルダ未選択の場合は何もしない
+      return;
+    }
+
     let currentFramePos = calculateStartFrame();
     const gap = placementMode === 'continuous' ? 0 : gapFrames;
 
@@ -138,16 +156,18 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
 
         {/* コンテンツ */}
         <div className="p-4 space-y-4">
-          {/* ソースフォルダ */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-ink-secondary">素材フォルダパス</label>
-            <Input
-              type="text"
-              value={folderPath}
-              onChange={(e) => setFolderPath(e.target.value)}
-              placeholder="/path/to/videos"
-            />
-          </div>
+          {/* 素材フォルダ（新コンポーネント使用） */}
+          <FolderSelector
+            folderPath={folderPath}
+            onSelect={handleSelectFolder}
+            isLoading={isLoadingFiles}
+            error={fileError}
+            files={videoFiles}
+            totalCount={videoFileCount}
+            label="素材フォルダ"
+            placeholder="/path/to/videos"
+            previewLimit={10}
+          />
 
           {/* 選択モード（新モジュール使用） */}
           <SelectionModeSelect

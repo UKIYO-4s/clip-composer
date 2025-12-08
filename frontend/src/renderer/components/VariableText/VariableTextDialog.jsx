@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { addClip, selectLayerOrder, selectLayers } from '../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../ui';
 import { X } from '../Icons';
+import { FontSelector, FontStyleControls } from '../FontSelector';
 
 const generateId = () => `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -34,15 +35,25 @@ const VariableTextDialog = ({ isOpen, onClose }) => {
   const layers = useSelector(selectLayers);
   const currentFrame = useSelector((state) => state.timeline.currentFrame);
 
+  // モード切り替え
+  const [mode, setMode] = useState('template'); // 'template' | 'csv_placeholder'
+
   // 設定状態
   const [template, setTemplate] = useState('{{商品名}}が今なら{{割引率}}OFF!');
   const [variableValues, setVariableValues] = useState({});
+  const [csvColumnName, setCsvColumnName] = useState(''); // CSV列名
   const [targetLayer, setTargetLayer] = useState('V1');
   const [clipDuration, setClipDuration] = useState(90); // フレーム
   const [startFrame, setStartFrame] = useState(0);
   const [fontSize, setFontSize] = useState(48);
+  const [fontFamily, setFontFamily] = useState('Hiragino Sans');
   const [textColor, setTextColor] = useState('#ffffff');
   const [bgColor, setBgColor] = useState('#000000');
+  const [fontWeight, setFontWeight] = useState(400);
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [strokeWidth, setStrokeWidth] = useState(0);
+  const [strokeColor, setStrokeColor] = useState('#000000');
 
   // テンプレートから変数を抽出
   const variables = useMemo(() => extractVariables(template), [template]);
@@ -73,25 +84,55 @@ const VariableTextDialog = ({ isOpen, onClose }) => {
 
   // 作成実行
   const handleCreate = useCallback(() => {
-    const clipData = {
-      id: generateId(),
-      type: 'variable_text',
-      name: `可変テキスト: ${template.substring(0, 20)}...`,
-      startFrame: startFrame,
-      durationFrames: clipDuration,
-      opacity: 100,
-      // 可変テキスト固有プロパティ
-      template: template,
-      variables: variables,
-      variableValues: variableValues,
-      fontSize: fontSize,
-      textColor: textColor,
-      bgColor: bgColor,
-    };
+    let clipData;
+
+    if (mode === 'template') {
+      clipData = {
+        id: generateId(),
+        type: 'variable_text',
+        name: `可変テキスト: ${template.substring(0, 20)}...`,
+        startFrame: startFrame,
+        durationFrames: clipDuration,
+        opacity: 100,
+        // 可変テキスト固有プロパティ
+        template: template,
+        variables: variables,
+        variableValues: variableValues,
+        fontSize: fontSize,
+        fontFamily: fontFamily,
+        textColor: textColor,
+        bgColor: bgColor,
+        fontWeight: fontWeight,
+        isBold: isBold,
+        isItalic: isItalic,
+        strokeWidth: strokeWidth,
+        strokeColor: strokeColor,
+      };
+    } else {
+      clipData = {
+        id: generateId(),
+        type: 'csv_text_placeholder',
+        name: `CSVテキスト: ${csvColumnName}`,
+        startFrame: startFrame,
+        durationFrames: clipDuration,
+        opacity: 100,
+        // CSVプレースホルダー固有プロパティ
+        csvColumnName: csvColumnName,
+        fontSize: fontSize,
+        fontFamily: fontFamily,
+        textColor: textColor,
+        bgColor: bgColor,
+        fontWeight: fontWeight,
+        isBold: isBold,
+        isItalic: isItalic,
+        strokeWidth: strokeWidth,
+        strokeColor: strokeColor,
+      };
+    }
 
     dispatch(addClip({ layerId: targetLayer, clip: clipData }));
     onClose();
-  }, [dispatch, template, variables, variableValues, targetLayer, startFrame, clipDuration, fontSize, textColor, bgColor, onClose]);
+  }, [mode, dispatch, template, variables, variableValues, csvColumnName, targetLayer, startFrame, clipDuration, fontSize, fontFamily, textColor, bgColor, fontWeight, isBold, isItalic, strokeWidth, strokeColor, onClose]);
 
   if (!isOpen) return null;
 
@@ -110,59 +151,122 @@ const VariableTextDialog = ({ isOpen, onClose }) => {
           />
         </div>
 
+        {/* モード切り替えタブ */}
+        <div className="flex border-b border-line">
+          <button
+            className={`flex-1 py-2 text-sm font-medium ${mode === 'template' ? 'text-accent-blue border-b-2 border-accent-blue' : 'text-ink-secondary'}`}
+            onClick={() => setMode('template')}
+          >
+            テンプレート
+          </button>
+          <button
+            className={`flex-1 py-2 text-sm font-medium ${mode === 'csv_placeholder' ? 'text-accent-blue border-b-2 border-accent-blue' : 'text-ink-secondary'}`}
+            onClick={() => setMode('csv_placeholder')}
+          >
+            CSVプレースホルダー
+          </button>
+        </div>
+
         {/* コンテンツ */}
         <div className="p-4 space-y-4">
-          {/* テンプレート入力 */}
+          {mode === 'template' ? (
+            <>
+              {/* テンプレート入力 */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-ink-secondary">
+                  テンプレート <span className="text-ink-muted">（{'{{変数名}}'} の形式で変数を使用）</span>
+                </label>
+                <textarea
+                  value={template}
+                  onChange={(e) => setTemplate(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm bg-surface-sunken border border-line rounded focus:outline-none focus:border-accent-blue text-ink-primary resize-none"
+                  placeholder="{{商品名}}が今なら{{割引率}}OFF!"
+                />
+              </div>
+
+              {/* 変数一覧 */}
+              {variables.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-ink-secondary">変数一覧（プレビュー用）</label>
+                  <div className="p-3 bg-surface-sunken rounded border border-line space-y-2">
+                    {variables.map((varName) => (
+                      <div key={varName} className="flex items-center gap-2">
+                        <span className="text-sm text-ink-muted w-24 truncate" title={varName}>
+                          {'{{'}{varName}{'}}'}:
+                        </span>
+                        <Input
+                          type="text"
+                          value={variableValues[varName] || ''}
+                          onChange={(e) => handleVariableChange(varName, e.target.value)}
+                          placeholder={`${varName}の値`}
+                          className="flex-1"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* プレビュー */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-ink-secondary">プレビュー</label>
+                <div
+                  className="p-4 rounded border border-line text-center"
+                  style={{
+                    backgroundColor: bgColor,
+                    color: textColor,
+                    fontSize: `${Math.min(fontSize, 24)}px`,
+                    fontFamily: fontFamily,
+                    fontWeight: isBold ? 'bold' : fontWeight,
+                    fontStyle: isItalic ? 'italic' : 'normal',
+                    WebkitTextStroke: strokeWidth > 0 ? `${strokeWidth}px ${strokeColor}` : 'none',
+                  }}
+                >
+                  {previewText || 'テンプレートを入力してください'}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* CSV列名入力 */}
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-ink-secondary">CSV列名</label>
+                <Input
+                  type="text"
+                  value={csvColumnName}
+                  onChange={(e) => setCsvColumnName(e.target.value)}
+                  placeholder="商品名"
+                />
+              </div>
+            </>
+          )}
+
+          {/* フォント選択 */}
           <div className="space-y-1">
-            <label className="text-xs font-medium text-ink-secondary">
-              テンプレート <span className="text-ink-muted">（{'{{変数名}}'} の形式で変数を使用）</span>
-            </label>
-            <textarea
-              value={template}
-              onChange={(e) => setTemplate(e.target.value)}
-              rows={3}
-              className="w-full px-3 py-2 text-sm bg-surface-sunken border border-line rounded focus:outline-none focus:border-accent-blue text-ink-primary resize-none"
-              placeholder="{{商品名}}が今なら{{割引率}}OFF!"
+            <label className="text-xs font-medium text-ink-secondary">フォント</label>
+            <FontSelector
+              value={fontFamily}
+              onChange={setFontFamily}
+              previewText={mode === 'template' ? (previewText || 'サンプル') : (csvColumnName || 'サンプル')}
             />
           </div>
 
-          {/* 変数一覧 */}
-          {variables.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-ink-secondary">変数一覧（プレビュー用）</label>
-              <div className="p-3 bg-surface-sunken rounded border border-line space-y-2">
-                {variables.map((varName) => (
-                  <div key={varName} className="flex items-center gap-2">
-                    <span className="text-sm text-ink-muted w-24 truncate" title={varName}>
-                      {'{{'}{varName}{'}}'}:
-                    </span>
-                    <Input
-                      type="text"
-                      value={variableValues[varName] || ''}
-                      onChange={(e) => handleVariableChange(varName, e.target.value)}
-                      placeholder={`${varName}の値`}
-                      className="flex-1"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* プレビュー */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-ink-secondary">プレビュー</label>
-            <div
-              className="p-4 rounded border border-line text-center"
-              style={{
-                backgroundColor: bgColor,
-                color: textColor,
-                fontSize: `${Math.min(fontSize, 24)}px`,
-              }}
-            >
-              {previewText || 'テンプレートを入力してください'}
-            </div>
-          </div>
+          {/* フォントスタイル */}
+          <FontStyleControls
+            fontWeight={fontWeight}
+            onFontWeightChange={setFontWeight}
+            isBold={isBold}
+            onBoldChange={setIsBold}
+            isItalic={isItalic}
+            onItalicChange={setIsItalic}
+            strokeWidth={strokeWidth}
+            onStrokeWidthChange={setStrokeWidth}
+            strokeColor={strokeColor}
+            onStrokeColorChange={setStrokeColor}
+            previewText={mode === 'template' ? (previewText || 'サンプル') : (csvColumnName || 'サンプル')}
+            fontFamily={fontFamily}
+          />
 
           {/* スタイル設定 */}
           <div className="grid grid-cols-3 gap-3">
@@ -257,7 +361,11 @@ const VariableTextDialog = ({ isOpen, onClose }) => {
           <Button variant="subtle" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" onClick={handleCreate} disabled={!template.trim()}>
+          <Button
+            variant="primary"
+            onClick={handleCreate}
+            disabled={mode === 'template' ? !template.trim() : !csvColumnName.trim()}
+          >
             作成
           </Button>
         </div>

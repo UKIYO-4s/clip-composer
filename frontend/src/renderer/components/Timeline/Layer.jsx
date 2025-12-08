@@ -29,30 +29,28 @@ function Layer({ layerId, layer, pixelsPerFrame }) {
       // 複数選択されている場合
       const clipIds = item.clipIds || [item.id];
 
-      if (clipIds.length > 1) {
+      if (clipIds.length > 1 && item.selectedClipsInfo) {
         // フレーム差分を計算（ドラッグ元の基準クリップからの差分）
         const deltaFrame = newStartFrame - item.originalStartFrame;
 
-        // clipMoves 配列を構築（各クリップの情報）
-        // 注: 複数選択の場合、各クリップの元レイヤー情報が必要
-        // ここでは簡略化のため、全てドラッグ元と同じレイヤーにあると仮定
-        const clipMoves = clipIds.map(id => ({
-          fromLayerId: item.layerId,
-          clipId: id,
-          originalStartFrame: item.originalStartFrame,
+        // clipMoves 配列を構築（各クリップの元の位置情報を使用）
+        const clipMoves = item.selectedClipsInfo.map(info => ({
+          fromLayerId: info.layerId,
+          clipId: info.clipId,
+          originalStartFrame: info.startFrame,
         }));
 
         if (isAltPressed) {
           dispatch(duplicateClipsWithDelta({
             clipMoves,
             deltaFrame,
-            targetLayerId: layerId,
+            targetLayerId: null, // 各クリップを元のレイヤーに複製
           }));
         } else {
           dispatch(moveClipsWithDelta({
             clipMoves,
             deltaFrame,
-            targetLayerId: layerId,
+            targetLayerId: null, // 各クリップを元のレイヤー内で移動
           }));
         }
       } else {

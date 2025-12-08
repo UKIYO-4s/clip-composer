@@ -92,6 +92,11 @@ const MarqueeSelection = ({ timelineRef, layers, layerOrder, pixelsPerFrame }) =
     const minY = Math.min(startPoint.y, currentPoint.y);
     const maxY = Math.max(startPoint.y, currentPoint.y);
 
+    // ドラッグ範囲が意味のある大きさかチェック（5px以上）
+    const width = Math.abs(currentPoint.x - startPoint.x);
+    const height = Math.abs(currentPoint.y - startPoint.y);
+    const wasActualDrag = width > 5 || height > 5;
+
     // フレーム範囲に変換
     const minFrame = minX / pixelsPerFrame;
     const maxFrame = maxX / pixelsPerFrame;
@@ -128,6 +133,14 @@ const MarqueeSelection = ({ timelineRef, layers, layerOrder, pixelsPerFrame }) =
         // 通常は新規選択
         dispatch(selectClips({ clipIds: selectedIds }));
       }
+    }
+
+    // ドラッグがあった場合、次のclickイベントでclearSelectionが呼ばれないようにフラグを立てる
+    if (wasActualDrag) {
+      window.__justFinishedMarquee = true;
+      setTimeout(() => {
+        window.__justFinishedMarquee = false;
+      }, 100);
     }
 
     setIsSelecting(false);

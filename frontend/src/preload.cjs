@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // File operations
   selectFolder: () => ipcRenderer.invoke('select-folder'),
+  listFolderFiles: (folderPath, extensions) =>
+    ipcRenderer.invoke('list-folder-files', { folderPath, extensions }),
   selectDirectory: (options) => ipcRenderer.invoke('select-directory', options),
   selectFiles: (options) => ipcRenderer.invoke('select-files', options),
   openFile: (options) => ipcRenderer.invoke('open-file', options),

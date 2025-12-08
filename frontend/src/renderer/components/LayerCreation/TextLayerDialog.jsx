@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { addClip, selectLayerOrder, selectLayers } from '../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../ui';
 import { X } from '../Icons';
+import { FontSelector, FontStyleControls } from '../FontSelector';
 
 const generateId = () => `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -18,8 +19,14 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
   const [clipDuration, setClipDuration] = useState(90); // フレーム
   const [startFrame, setStartFrame] = useState(0);
   const [fontSize, setFontSize] = useState(48);
+  const [fontFamily, setFontFamily] = useState('Hiragino Sans');
   const [textColor, setTextColor] = useState('#ffffff');
   const [bgColor, setBgColor] = useState('#000000');
+  const [fontWeight, setFontWeight] = useState(400);
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [strokeWidth, setStrokeWidth] = useState(0);
+  const [strokeColor, setStrokeColor] = useState('#000000');
 
   // 現在位置を使用
   const handleUseCurrentPosition = () => {
@@ -49,14 +56,20 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
       // テキスト固有プロパティ
       textContent: textContent,
       fontSize: fontSize,
+      fontFamily: fontFamily,
       textColor: textColor,
       bgColor: bgColor,
+      fontWeight: fontWeight,
+      isBold: isBold,
+      isItalic: isItalic,
+      strokeWidth: strokeWidth,
+      strokeColor: strokeColor,
       animation: { type: 'none', duration_frames: 15 },
     };
 
     dispatch(addClip({ layerId: targetLayer, clip: clipData }));
     onClose();
-  }, [dispatch, textContent, targetLayer, startFrame, clipDuration, fontSize, textColor, bgColor, onClose]);
+  }, [dispatch, textContent, targetLayer, startFrame, clipDuration, fontSize, fontFamily, textColor, bgColor, fontWeight, isBold, isItalic, strokeWidth, strokeColor, onClose]);
 
   if (!isOpen) return null;
 
@@ -98,11 +111,41 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
                 backgroundColor: bgColor,
                 color: textColor,
                 fontSize: `${Math.min(fontSize, 24)}px`,
+                fontFamily: fontFamily,
+                fontWeight: isBold ? 'bold' : fontWeight,
+                fontStyle: isItalic ? 'italic' : 'normal',
+                WebkitTextStroke: strokeWidth > 0 ? `${strokeWidth}px ${strokeColor}` : 'none',
               }}
             >
               {textContent || 'テキストを入力してください'}
             </div>
           </div>
+
+          {/* フォント選択 */}
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-ink-secondary">フォント</label>
+            <FontSelector
+              value={fontFamily}
+              onChange={setFontFamily}
+              previewText={textContent || 'サンプル'}
+            />
+          </div>
+
+          {/* フォントスタイル */}
+          <FontStyleControls
+            fontWeight={fontWeight}
+            onFontWeightChange={setFontWeight}
+            isBold={isBold}
+            onBoldChange={setIsBold}
+            isItalic={isItalic}
+            onItalicChange={setIsItalic}
+            strokeWidth={strokeWidth}
+            onStrokeWidthChange={setStrokeWidth}
+            strokeColor={strokeColor}
+            onStrokeColorChange={setStrokeColor}
+            previewText={textContent || 'サンプル'}
+            fontFamily={fontFamily}
+          />
 
           {/* スタイル設定 */}
           <div className="grid grid-cols-3 gap-3">
