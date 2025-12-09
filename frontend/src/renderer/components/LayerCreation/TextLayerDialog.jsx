@@ -27,6 +27,10 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
   const [isItalic, setIsItalic] = useState(false);
   const [strokeWidth, setStrokeWidth] = useState(0);
   const [strokeColor, setStrokeColor] = useState('#000000');
+  const [strokePosition, setStrokePosition] = useState('center');
+  const [blendMode, setBlendMode] = useState('normal');
+  const [letterSpacing, setLetterSpacing] = useState(0);
+  const [textOpacity, setTextOpacity] = useState(100);
 
   // 現在位置を使用
   const handleUseCurrentPosition = () => {
@@ -64,12 +68,16 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
       isItalic: isItalic,
       strokeWidth: strokeWidth,
       strokeColor: strokeColor,
+      strokePosition: strokePosition,
+      blendMode: blendMode,
+      letterSpacing: letterSpacing,
+      textOpacity: textOpacity,
       animation: { type: 'none', duration_frames: 15 },
     };
 
     dispatch(addClip({ layerId: targetLayer, clip: clipData }));
     onClose();
-  }, [dispatch, textContent, targetLayer, startFrame, clipDuration, fontSize, fontFamily, textColor, bgColor, fontWeight, isBold, isItalic, strokeWidth, strokeColor, onClose]);
+  }, [dispatch, textContent, targetLayer, startFrame, clipDuration, fontSize, fontFamily, textColor, bgColor, fontWeight, isBold, isItalic, strokeWidth, strokeColor, strokePosition, blendMode, letterSpacing, textOpacity, onClose]);
 
   if (!isOpen) return null;
 
@@ -115,6 +123,10 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
                 fontWeight: isBold ? 'bold' : fontWeight,
                 fontStyle: isItalic ? 'italic' : 'normal',
                 WebkitTextStroke: strokeWidth > 0 ? `${strokeWidth}px ${strokeColor}` : 'none',
+                paintOrder: strokePosition === 'outside' ? 'stroke fill' : 'fill stroke',
+                letterSpacing: `${letterSpacing}px`,
+                opacity: textOpacity / 100,
+                mixBlendMode: blendMode,
               }}
             >
               {textContent || 'テキストを入力してください'}
@@ -143,6 +155,14 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
             onStrokeWidthChange={setStrokeWidth}
             strokeColor={strokeColor}
             onStrokeColorChange={setStrokeColor}
+            strokePosition={strokePosition}
+            onStrokePositionChange={setStrokePosition}
+            blendMode={blendMode}
+            onBlendModeChange={setBlendMode}
+            letterSpacing={letterSpacing}
+            onLetterSpacingChange={setLetterSpacing}
+            textOpacity={textOpacity}
+            onTextOpacityChange={setTextOpacity}
             previewText={textContent || 'サンプル'}
             fontFamily={fontFamily}
           />

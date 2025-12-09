@@ -106,8 +106,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
 
   // 一括配置実行
   const handleBulkPlace = useCallback(() => {
-    if (!folderPath) {
-      // フォルダ未選択の場合は何もしない
+    if (!folderPath || !calculated.clipCount) {
       return;
     }
 
@@ -129,7 +128,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
         randomSeed: Math.random(),
       };
 
-      dispatch(addClip({ layerId: targetLayer, clip: clipData }));
+      dispatch(addClip({ layerId: targetLayer, clip: clipData, skipOverlapCheck: true }));
 
       currentFramePos += calculated.clipDurationFrames + gap;
     }

@@ -184,20 +184,25 @@ const timelineSlice = createSlice({
       state.currentFrame = action.payload;
     },
     addClip: (state, action) => {
-      const { layerId, clip } = action.payload;
+      const { layerId, clip, skipOverlapCheck } = action.payload;
       const layer = state.layers[layerId];
 
-      // 重複処理
-      const otherClips = handleClipOverlap(layer.clips, clip);
+      if (skipOverlapCheck) {
+        // 重複チェックをスキップ（一括配置用）
+        layer.clips.push(clip);
+      } else {
+        // 重複処理
+        const otherClips = handleClipOverlap(layer.clips, clip);
 
-      // 削除されたクリップIDを選択から除外
-      const removedClipIds = layer.clips
-        .filter(c => !otherClips.find(oc => oc.id === c.id))
-        .map(c => c.id);
-      state.selectedClipIds = state.selectedClipIds.filter(id => !removedClipIds.includes(id));
+        // 削除されたクリップIDを選択から除外
+        const removedClipIds = layer.clips
+          .filter(c => !otherClips.find(oc => oc.id === c.id))
+          .map(c => c.id);
+        state.selectedClipIds = state.selectedClipIds.filter(id => !removedClipIds.includes(id));
 
-      // クリップ配列を更新
-      layer.clips = [...otherClips, clip];
+        // クリップ配列を更新
+        layer.clips = [...otherClips, clip];
+      }
     },
     removeClip: (state, action) => {
       const { layerId, clipId } = action.payload;
