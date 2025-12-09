@@ -211,6 +211,7 @@ function PreviewCanvas() {
   const drawTextClip = (ctx, clip, width, height) => {
     const text = renderVariableText(clip);
     const fontSize = clip.fontSize || 48;
+    const fontFamily = clip.fontFamily || 'Hiragino Sans, sans-serif';
     const textColor = clip.textColor || '#FFFFFF';
     const bgColor = clip.bgColor || 'transparent';
 
@@ -232,7 +233,7 @@ function PreviewCanvas() {
 
     // テキスト描画
     ctx.fillStyle = textColor;
-    ctx.font = `bold ${Math.min(fontSize * scale, 200)}px sans-serif`;
+    ctx.font = `bold ${Math.min(fontSize * scale, 200)}px ${fontFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, width / 2 + posX, height / 2 + posY);

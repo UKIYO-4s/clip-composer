@@ -74,4 +74,8 @@ export {
 
   // Random Layer Management
   RotateCcw,
+
+  // Undo/Redo
+  Undo2 as Undo,
+  Redo2 as Redo,
 } from 'lucide-react';

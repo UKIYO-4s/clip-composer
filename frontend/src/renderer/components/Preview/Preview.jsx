@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
 import PreviewCanvas from './PreviewCanvas';
+import { useAudioPreview } from '../../hooks/useAudioPreview';
 
 /**
  * Preview - プレビューパネルコンポーネント
@@ -8,6 +9,9 @@ import PreviewCanvas from './PreviewCanvas';
  */
 function Preview() {
   const { currentFrame, fps } = useSelector((state) => state.timeline);
+
+  // オーディオプレビュー再生
+  useAudioPreview();
 
   // フレームをタイムコードに変換 (HH:MM:SS:FF)
   const frameToTimecode = (frame) => {

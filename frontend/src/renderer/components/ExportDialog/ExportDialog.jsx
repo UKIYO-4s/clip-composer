@@ -13,6 +13,7 @@ import {
   incrementBatchSuccess,
   exportSuccess,
   batchExportComplete,
+  clearBatchCompleted,
   exportError,
   cancelExport,
   selectExportState,
@@ -81,7 +82,8 @@ function ExportDialog() {
     error,
     exportMode,
     csvPath,
-    batchProgress
+    batchProgress,
+    batchCompleted,
   } = exportState;
 
   // タイムラインから抽出したCSVカラム（hooksは条件付きreturnの前に呼ぶ必要がある）
@@ -340,6 +342,45 @@ function ExportDialog() {
     dispatch(setExportSettings({ [key]: value }));
   };
 
+  // エラーログをCSVで出力
+  const handleExportErrorLog = async () => {
+    if (batchProgress.errors.length === 0) return;
+
+    try {
+      const result = await window.api.saveFile({
+        defaultPath: 'error_log.csv',
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      });
+
+      if (result.canceled || !result.filePath) return;
+
+      // エラーログCSVを生成
+      const bom = '\uFEFF';
+      const header = '行番号,動画名,エラー内容';
+      const rows = batchProgress.errors.map((err) =>
+        `${err.row},${escapeCsvValue(err.videoName)},${escapeCsvValue(err.error)}`
+      );
+      const csvContent = `${bom}${header}\n${rows.join('\n')}\n`;
+
+      const writeResult = await window.api.fs.writeTextFile(result.filePath, csvContent);
+
+      if (writeResult.success) {
+        alert(`エラーログを保存しました:\n${result.filePath}`);
+      } else {
+        alert('エラーログの保存に失敗しました');
+      }
+    } catch (err) {
+      console.error('Failed to export error log:', err);
+      alert('エラーログの保存中にエラーが発生しました');
+    }
+  };
+
+  // バッチ完了後にダイアログを閉じる
+  const handleCloseBatchComplete = () => {
+    dispatch(clearBatchCompleted());
+    dispatch(closeExportDialog());
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="w-full max-w-md rounded-lg border border-line bg-surface-raised shadow-xl">
@@ -357,7 +398,76 @@ function ExportDialog() {
 
         {/* コンテンツ */}
         <div className="p-4 space-y-4">
-          {isExporting ? (
+          {batchCompleted ? (
+            /* バッチ完了サマリー */
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                {batchProgress.errorCount === 0 ? (
+                  <div className="text-accent-green text-4xl mb-2">✓</div>
+                ) : (
+                  <div className="text-accent-yellow text-4xl mb-2">⚠</div>
+                )}
+                <h3 className="text-lg font-semibold text-white mb-1">
+                  {batchProgress.errorCount === 0 ? '書き出し完了' : '書き出し完了（一部エラー）'}
+                </h3>
+                <p className="text-sm text-ink-secondary">
+                  {batchProgress.total}件中{batchProgress.successCount}件が正常に書き出されました
+                </p>
+              </div>
+
+              {/* 結果サマリー */}
+              <div className="p-3 rounded border border-line bg-surface text-sm">
+                <div className="flex justify-between mb-2">
+                  <span className="text-ink-secondary">合計:</span>
+                  <span className="text-white font-semibold">{batchProgress.total}件</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-ink-secondary">成功:</span>
+                  <span className="text-accent-green font-semibold">{batchProgress.successCount}件</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-ink-secondary">失敗:</span>
+                  <span className={`font-semibold ${batchProgress.errorCount > 0 ? 'text-accent-red' : 'text-ink-muted'}`}>
+                    {batchProgress.errorCount}件
+                  </span>
+                </div>
+              </div>
+
+              {/* エラーがある場合の詳細とログ出力 */}
+              {batchProgress.errors.length > 0 && (
+                <div className="p-3 rounded border border-accent-red/30 bg-accent-red/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-accent-red">エラー詳細</span>
+                    <Button
+                      variant="subtle"
+                      size="sm"
+                      onClick={handleExportErrorLog}
+                    >
+                      エラーログ出力
+                    </Button>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {batchProgress.errors.map((err, idx) => (
+                      <div key={idx} className="text-xs text-accent-red">
+                        行{err.row} ({err.videoName}): {err.error}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* アクションボタン */}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={handleCloseBatchComplete}
+                >
+                  閉じる
+                </Button>
+              </div>
+            </div>
+          ) : isExporting ? (
             <>
               <ExportProgress
                 progress={progress}
@@ -544,7 +654,7 @@ function ExportDialog() {
         </div>
 
         {/* フッター */}
-        {!isExporting && (
+        {!isExporting && !batchCompleted && (
           <div className="flex justify-end gap-2 border-t border-line p-4">
             <Button
               variant="ghost"

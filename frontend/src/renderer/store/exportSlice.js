@@ -27,6 +27,9 @@ const initialState = {
     errorCount: 0,
     errors: [],
   },
+  // バッチ完了状態
+  batchCompleted: false,
+  failedRows: [], // リトライ用に失敗した行データを保持
 };
 
 // 解像度プリセット
@@ -94,6 +97,8 @@ const exportSlice = createSlice({
       state.elapsedTime = 0;
       state.estimatedRemaining = 0;
       state.error = null;
+      state.batchCompleted = false;
+      state.failedRows = [];
       state.batchProgress = {
         current: 0,
         total: action.payload.total || 0,
@@ -123,6 +128,15 @@ const exportSlice = createSlice({
     addBatchError: (state, action) => {
       state.batchProgress.errorCount += 1;
       state.batchProgress.errors.push(action.payload);
+      // リトライ用に失敗した行データを保存
+      if (action.payload.rowData) {
+        state.failedRows.push({
+          row: action.payload.row,
+          videoName: action.payload.videoName,
+          error: action.payload.error,
+          rowData: action.payload.rowData,
+        });
+      }
     },
     incrementBatchSuccess: (state) => {
       state.batchProgress.successCount += 1;
@@ -135,8 +149,20 @@ const exportSlice = createSlice({
     batchExportComplete: (state, action) => {
       state.isExporting = false;
       state.progress = 100;
+      state.batchCompleted = true;
       const { successCount, errorCount } = state.batchProgress;
       state.currentTask = `完了: 成功 ${successCount}件 / 失敗 ${errorCount}件`;
+    },
+    clearBatchCompleted: (state) => {
+      state.batchCompleted = false;
+      state.failedRows = [];
+      state.batchProgress = {
+        current: 0,
+        total: 0,
+        successCount: 0,
+        errorCount: 0,
+        errors: [],
+      };
     },
     exportError: (state, action) => {
       state.isExporting = false;
@@ -172,6 +198,7 @@ export const {
   incrementBatchSuccess,
   exportSuccess,
   batchExportComplete,
+  clearBatchCompleted,
   exportError,
   cancelExport,
   resetExport,

@@ -4,6 +4,7 @@ import { updateClip } from '../../store/timelineSlice';
 import { ChevronDown } from '../Icons';
 import { Input } from '../ui';
 import EffectSection from './EffectSection';
+import FontSelector from '../FontSelector/FontSelector';
 
 // アコーディオンセクションコンポーネント
 const Section = ({ title, children, defaultOpen = true }) => {
@@ -243,13 +244,22 @@ const PropertyPanel = () => {
       )}
 
       {/* テキストプロパティ */}
-      {clip.type === 'text' && (
+      {(clip.type === 'text' || clip.type === 'variable_text' || clip.type === 'csv_text_placeholder') && (
         <Section title="テキスト設定" defaultOpen={true}>
-          <Field label="テキスト内容">
-            <TextArea
-              value={clip.textContent}
-              onChange={(value) => handleUpdate({ textContent: value })}
-              rows={4}
+          {clip.type === 'text' && (
+            <Field label="テキスト内容">
+              <TextArea
+                value={clip.textContent}
+                onChange={(value) => handleUpdate({ textContent: value })}
+                rows={4}
+              />
+            </Field>
+          )}
+          <Field label="フォント">
+            <FontSelector
+              value={clip.fontFamily || 'Hiragino Sans'}
+              onChange={(value) => handleUpdate({ fontFamily: value })}
+              previewText={clip.textContent || clip.template || 'サンプル'}
             />
           </Field>
           <Field label="フォントサイズ">

@@ -5,6 +5,10 @@ import {
   setIsPlaying,
   setLoopEnabled,
   selectLayers,
+  undo,
+  redo,
+  selectCanUndo,
+  selectCanRedo,
 } from '../../store/timelineSlice';
 import {
   Play,
@@ -16,6 +20,8 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Repeat,
+  Undo,
+  Redo,
 } from '../Icons';
 
 function TransportControls() {
@@ -28,6 +34,8 @@ function TransportControls() {
     loopEnabled,
   } = useSelector((state) => state.timeline);
   const layers = useSelector(selectLayers);
+  const canUndo = useSelector(selectCanUndo);
+  const canRedo = useSelector(selectCanRedo);
 
   const animationFrameId = useRef(null);
   const lastFrameTime = useRef(null);
@@ -130,6 +138,14 @@ function TransportControls() {
 
   const handleToggleLoop = () => {
     dispatch(setLoopEnabled(!loopEnabled));
+  };
+
+  const handleUndo = () => {
+    if (canUndo) dispatch(undo());
+  };
+
+  const handleRedo = () => {
+    if (canRedo) dispatch(redo());
   };
 
   // 前のクリップ境界へジャンプ
@@ -239,6 +255,37 @@ function TransportControls() {
         title="ループ切り替え (L)"
       >
         <Repeat className="w-4 h-4" />
+      </button>
+
+      {/* 区切り線 */}
+      <div className="w-px h-6 bg-line mx-2" />
+
+      {/* Undo */}
+      <button
+        onClick={handleUndo}
+        disabled={!canUndo}
+        className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+          canUndo
+            ? 'hover:bg-state-hover text-ink-secondary hover:text-ink-primary'
+            : 'text-ink-muted cursor-not-allowed'
+        }`}
+        title="元に戻す (Cmd+Z)"
+      >
+        <Undo className="w-4 h-4" />
+      </button>
+
+      {/* Redo */}
+      <button
+        onClick={handleRedo}
+        disabled={!canRedo}
+        className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+          canRedo
+            ? 'hover:bg-state-hover text-ink-secondary hover:text-ink-primary'
+            : 'text-ink-muted cursor-not-allowed'
+        }`}
+        title="やり直す (Cmd+Shift+Z)"
+      >
+        <Redo className="w-4 h-4" />
       </button>
 
       {/* 再生情報 */}
