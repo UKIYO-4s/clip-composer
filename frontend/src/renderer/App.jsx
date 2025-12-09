@@ -9,6 +9,7 @@ import AssetPanel from './components/AssetPanel';
 import FileMenu from './components/Menu/FileMenu';
 import ExportDialog from './components/ExportDialog';
 import NewProjectDialog from './components/NewProjectDialog';
+import useAutoSave from './hooks/useAutoSave';
 import { openExportDialog } from './store/exportSlice';
 import { setShowNewProjectDialog } from './store/timelineSlice';
 import { Button } from './components/ui';
@@ -67,6 +68,12 @@ function App() {
   const canRedo = useSelector(selectCanRedo);
   const resolution = useSelector(selectResolution);
   const fps = useSelector(selectFps);
+
+  // 自動保存（3分間隔）
+  const { lastSaveTime, isSaving } = useAutoSave({
+    interval: 3 * 60 * 1000,
+    enabled: true,
+  });
 
   // エクスポートダイアログを開く
   const handleOpenExport = useCallback(() => {
@@ -260,6 +267,94 @@ function App() {
 
     // 新規プロジェクトダイアログを表示
     dispatch(setShowNewProjectDialog(true));
+  }, [dispatch, isDirty]);
+
+  // テンプレートとして保存
+  const handleSaveAsTemplate = useCallback(async () => {
+    const templateName = window.prompt('テンプレート名を入力してください', projectName);
+    if (!templateName) return;
+
+    try {
+      const projectData = {
+        version: '1.0',
+        name: templateName,
+        settings: {
+          fps: fps,
+          resolution: resolution,
+        },
+        assets: assets,
+        timeline: {
+          layers: layers,
+          layerOrder: layerOrder,
+          totalFrames: totalFrames,
+          resolution: resolution,
+          fps: fps,
+        },
+      };
+
+      const result = await window.api.templates.save(templateName, projectData);
+
+      if (result.success) {
+        alert(`テンプレート「${templateName}」を保存しました`);
+      } else {
+        alert('テンプレートの保存に失敗しました: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error saving template:', error);
+      alert('テンプレート保存エラー: ' + error.message);
+    }
+  }, [projectName, layers, layerOrder, totalFrames, assets, resolution, fps]);
+
+  // テンプレートから読み込み
+  const handleLoadTemplate = useCallback(async (templateName) => {
+    // 未保存の変更がある場合は確認
+    if (isDirty) {
+      const confirmed = window.confirm('保存されていない変更があります。続行しますか？');
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    try {
+      const result = await window.api.templates.load(templateName);
+
+      if (!result.success) {
+        alert('テンプレートの読み込みに失敗しました: ' + result.error);
+        return;
+      }
+
+      const templateData = result.data;
+
+      // プロジェクト情報を更新（テンプレートから新規作成）
+      dispatch(loadProjectState({
+        name: `${templateName}_copy`,
+        path: null,
+        settings: templateData.settings,
+        version: templateData.version,
+      }));
+
+      // タイムライン状態を復元
+      if (templateData.timeline) {
+        dispatch(loadTimeline({
+          layers: templateData.timeline.layers,
+          layerOrder: templateData.timeline.layerOrder,
+          totalFrames: templateData.timeline.totalFrames,
+          resolution: templateData.timeline.resolution || templateData.settings?.resolution,
+          fps: templateData.timeline.fps || templateData.settings?.fps,
+        }));
+      }
+
+      // アセット状態を復元
+      if (templateData.assets) {
+        dispatch(setAssets(templateData.assets));
+      }
+
+      dispatch(setDirty(true)); // 新規作成なのでdirtyにする
+      console.log('Template loaded:', templateName);
+    } catch (error) {
+      console.error('Error loading template:', error);
+      alert('テンプレート読み込みエラー: ' + error.message);
+    }
   }, [dispatch, isDirty]);
 
   // 未保存の変更がある場合の警告
@@ -593,6 +688,8 @@ function App() {
               onLoadProject={handleLoadProject}
               onSaveProject={handleSaveProject}
               onSaveAsProject={handleSaveAsProject}
+              onSaveAsTemplate={handleSaveAsTemplate}
+              onLoadTemplate={handleLoadTemplate}
             />
             <h1 className="text-lg font-semibold">
               {projectName}

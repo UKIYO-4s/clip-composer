@@ -85,6 +85,30 @@ contextBridge.exposeInMainWorld('api', {
 
     // プロジェクトを読み込み
     load: (path) => ipcRenderer.invoke('load-project', { path }),
+
+    // 自動保存
+    autoSave: (data) => ipcRenderer.invoke('auto-save-project', { data }),
+
+    // 自動保存を復元
+    getAutoSaves: () => ipcRenderer.invoke('get-auto-saves'),
+
+    // 自動保存を削除
+    deleteAutoSave: (filename) => ipcRenderer.invoke('delete-auto-save', { filename }),
+  },
+
+  // テンプレート操作
+  templates: {
+    // テンプレートとして保存
+    save: (name, data) => ipcRenderer.invoke('save-template', { name, data }),
+
+    // テンプレート一覧取得
+    list: () => ipcRenderer.invoke('list-templates'),
+
+    // テンプレートを読み込み
+    load: (name) => ipcRenderer.invoke('load-template', { name }),
+
+    // テンプレートを削除
+    delete: (name) => ipcRenderer.invoke('delete-template', { name }),
   },
 
   // ファイルシステム操作

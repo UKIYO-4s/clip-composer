@@ -13,11 +13,13 @@ import {
   selectRecentFiles,
   loadProjectState,
 } from '../../store/projectSlice';
-import { FilePlus, FolderOpen, Save, Clock, ChevronRight } from '../Icons';
+import { FilePlus, FolderOpen, Save, Clock, ChevronRight, Layers } from '../Icons';
 
-const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject }) => {
+const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject, onSaveAsTemplate, onLoadTemplate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [recentFilesOpen, setRecentFilesOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templates, setTemplates] = useState([]);
   const menuRef = useRef(null);
   const dispatch = useDispatch();
 
@@ -25,6 +27,21 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
   const projectPath = useSelector(selectProjectPath);
   const isDirty = useSelector(selectIsDirty);
   const recentFiles = useSelector(selectRecentFiles);
+
+  // テンプレート一覧を取得
+  useEffect(() => {
+    const loadTemplates = async () => {
+      if (window.api?.templates?.list) {
+        const result = await window.api.templates.list();
+        if (result.success) {
+          setTemplates(result.templates);
+        }
+      }
+    };
+    if (isOpen) {
+      loadTemplates();
+    }
+  }, [isOpen]);
 
   // メニュー外クリックで閉じる
   useEffect(() => {
@@ -44,6 +61,7 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
   const handleMenuClick = () => {
     setIsOpen(!isOpen);
     setRecentFilesOpen(false);
+    setTemplatesOpen(false);
   };
 
   const handleNewProject = () => {
@@ -79,6 +97,21 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
     setRecentFilesOpen(false);
     if (onLoadProject) {
       onLoadProject(filePath);
+    }
+  };
+
+  const handleSaveAsTemplate = () => {
+    setIsOpen(false);
+    if (onSaveAsTemplate) {
+      onSaveAsTemplate();
+    }
+  };
+
+  const handleTemplateClick = (templateName) => {
+    setIsOpen(false);
+    setTemplatesOpen(false);
+    if (onLoadTemplate) {
+      onLoadTemplate(templateName);
     }
   };
 
@@ -178,6 +211,56 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
                 )}
               </div>
             </>
+          )}
+
+          {/* Templates */}
+          <div className="border-t border-line my-1"></div>
+
+          {/* Save as Template */}
+          <button
+            onClick={handleSaveAsTemplate}
+            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary whitespace-nowrap"
+          >
+            <Layers className="w-4 h-4 text-ink-muted flex-shrink-0" />
+            <span className="flex-1">テンプレートとして保存...</span>
+          </button>
+
+          {/* Load from Template */}
+          {templates.length > 0 && (
+            <div className="relative">
+              <button
+                onMouseEnter={() => setTemplatesOpen(true)}
+                className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary whitespace-nowrap"
+              >
+                <Layers className="w-4 h-4 text-ink-muted flex-shrink-0" />
+                <span className="flex-1">テンプレートから作成</span>
+                <ChevronRight className="w-4 h-4 text-ink-muted flex-shrink-0" />
+              </button>
+
+              {/* Templates submenu */}
+              {templatesOpen && (
+                <div
+                  className="absolute left-full top-0 ml-1 w-64 bg-surface-highest border border-line rounded shadow-lg max-h-96 overflow-y-auto"
+                  onMouseLeave={() => setTemplatesOpen(false)}
+                >
+                  {templates.map((template, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleTemplateClick(template.name)}
+                      className="w-full px-4 py-2 text-left hover:bg-state-hover text-sm transition-colors block truncate text-ink-primary"
+                      title={template.name}
+                    >
+                      <div className="font-medium">{template.name}</div>
+                      {template.createdAt && (
+                        <div className="text-xs text-ink-muted">
+                          {new Date(template.createdAt).toLocaleDateString('ja-JP')}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

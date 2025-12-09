@@ -420,3 +420,205 @@ ipcMain.handle('write-text-file', async (event, { path, content }) => {
     return { success: false, error: error.message };
   }
 });
+
+// ==============================
+// 自動保存機能
+// ==============================
+
+// アプリデータディレクトリを取得
+const getAppDataDir = () => {
+  const appDataPath = app.getPath('userData');
+  return appDataPath;
+};
+
+// 自動保存ディレクトリを取得（なければ作成）
+const getAutoSaveDir = async () => {
+  const fs = require('fs').promises;
+  const autoSaveDir = path.join(getAppDataDir(), 'autosave');
+  try {
+    await fs.mkdir(autoSaveDir, { recursive: true });
+  } catch (error) {
+    // ディレクトリが既に存在する場合は無視
+  }
+  return autoSaveDir;
+};
+
+// 自動保存を実行
+ipcMain.handle('auto-save-project', async (event, { data }) => {
+  const fs = require('fs').promises;
+  try {
+    const autoSaveDir = await getAutoSaveDir();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `autosave_${timestamp}.ccproj`;
+    const filePath = path.join(autoSaveDir, filename);
+
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+
+    // 古い自動保存を削除（最新5件のみ保持）
+    const files = await fs.readdir(autoSaveDir);
+    const autoSaveFiles = files
+      .filter(f => f.startsWith('autosave_') && f.endsWith('.ccproj'))
+      .sort()
+      .reverse();
+
+    for (let i = 5; i < autoSaveFiles.length; i++) {
+      await fs.unlink(path.join(autoSaveDir, autoSaveFiles[i]));
+    }
+
+    return { success: true, path: filePath };
+  } catch (error) {
+    console.error('Auto-save failed:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 自動保存一覧を取得
+ipcMain.handle('get-auto-saves', async () => {
+  const fs = require('fs').promises;
+  try {
+    const autoSaveDir = await getAutoSaveDir();
+    const files = await fs.readdir(autoSaveDir);
+    const autoSaveFiles = files
+      .filter(f => f.startsWith('autosave_') && f.endsWith('.ccproj'))
+      .sort()
+      .reverse();
+
+    const autoSaves = [];
+    for (const filename of autoSaveFiles) {
+      const filePath = path.join(autoSaveDir, filename);
+      const stat = await fs.stat(filePath);
+      autoSaves.push({
+        filename,
+        path: filePath,
+        savedAt: stat.mtime.toISOString(),
+      });
+    }
+
+    return { success: true, autoSaves };
+  } catch (error) {
+    console.error('Failed to get auto-saves:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// 自動保存を削除
+ipcMain.handle('delete-auto-save', async (event, { filename }) => {
+  const fs = require('fs').promises;
+  try {
+    const autoSaveDir = await getAutoSaveDir();
+    const filePath = path.join(autoSaveDir, filename);
+    await fs.unlink(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete auto-save:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ==============================
+// テンプレート機能
+// ==============================
+
+// テンプレートディレクトリを取得（なければ作成）
+const getTemplateDir = async () => {
+  const fs = require('fs').promises;
+  const templateDir = path.join(getAppDataDir(), 'templates');
+  try {
+    await fs.mkdir(templateDir, { recursive: true });
+  } catch (error) {
+    // ディレクトリが既に存在する場合は無視
+  }
+  return templateDir;
+};
+
+// テンプレートを保存
+ipcMain.handle('save-template', async (event, { name, data }) => {
+  const fs = require('fs').promises;
+  try {
+    const templateDir = await getTemplateDir();
+    // ファイル名をサニタイズ
+    const safeName = name.replace(/[<>:"/\\|?*]/g, '_');
+    const filename = `${safeName}.cctemplate`;
+    const filePath = path.join(templateDir, filename);
+
+    const templateData = {
+      ...data,
+      templateName: name,
+      createdAt: new Date().toISOString(),
+      isTemplate: true,
+    };
+
+    await fs.writeFile(filePath, JSON.stringify(templateData, null, 2), 'utf8');
+    return { success: true, path: filePath };
+  } catch (error) {
+    console.error('Failed to save template:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// テンプレート一覧を取得
+ipcMain.handle('list-templates', async () => {
+  const fs = require('fs').promises;
+  try {
+    const templateDir = await getTemplateDir();
+    const files = await fs.readdir(templateDir);
+    const templateFiles = files.filter(f => f.endsWith('.cctemplate'));
+
+    const templates = [];
+    for (const filename of templateFiles) {
+      const filePath = path.join(templateDir, filename);
+      try {
+        const content = await fs.readFile(filePath, 'utf8');
+        const data = JSON.parse(content);
+        templates.push({
+          name: data.templateName || filename.replace('.cctemplate', ''),
+          filename,
+          path: filePath,
+          createdAt: data.createdAt,
+        });
+      } catch (e) {
+        // 読み込みエラーは無視
+      }
+    }
+
+    return { success: true, templates };
+  } catch (error) {
+    console.error('Failed to list templates:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// テンプレートを読み込み
+ipcMain.handle('load-template', async (event, { name }) => {
+  const fs = require('fs').promises;
+  try {
+    const templateDir = await getTemplateDir();
+    const safeName = name.replace(/[<>:"/\\|?*]/g, '_');
+    const filename = `${safeName}.cctemplate`;
+    const filePath = path.join(templateDir, filename);
+
+    const content = await fs.readFile(filePath, 'utf8');
+    const data = JSON.parse(content);
+    return { success: true, data };
+  } catch (error) {
+    console.error('Failed to load template:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// テンプレートを削除
+ipcMain.handle('delete-template', async (event, { name }) => {
+  const fs = require('fs').promises;
+  try {
+    const templateDir = await getTemplateDir();
+    const safeName = name.replace(/[<>:"/\\|?*]/g, '_');
+    const filename = `${safeName}.cctemplate`;
+    const filePath = path.join(templateDir, filename);
+
+    await fs.unlink(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete template:', error);
+    return { success: false, error: error.message };
+  }
+});

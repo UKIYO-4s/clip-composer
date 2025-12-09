@@ -66,8 +66,8 @@ const useAutoSave = ({
       };
 
       // Electron IPC経由で保存
-      if (window.electronAPI?.autoSave) {
-        await window.electronAPI.autoSave(projectData);
+      if (window.api?.project?.autoSave) {
+        await window.api.project.autoSave(projectData);
       } else {
         // localStorage へのフォールバック
         const autoSaveKey = `clip-composer-autosave-${projectState?.name || 'untitled'}`;
