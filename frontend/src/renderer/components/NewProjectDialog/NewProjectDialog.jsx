@@ -5,6 +5,8 @@ import {
   setShowNewProjectDialog,
   selectShowNewProjectDialog,
 } from '../../store/timelineSlice';
+import { clearAssets } from '../../store/assetsSlice';
+import { newProject } from '../../store/projectSlice';
 import { Button, Input, Select } from '../ui';
 
 // 解像度プリセット
@@ -17,15 +19,6 @@ const resolutionPresets = [
   { value: 'custom', label: 'カスタム', width: 0, height: 0 },
 ];
 
-// 尺プリセット（秒）
-const durationPresets = [
-  { value: 15, label: '15秒' },
-  { value: 30, label: '30秒' },
-  { value: 60, label: '60秒 (1分)' },
-  { value: 90, label: '90秒' },
-  { value: 180, label: '180秒 (3分)' },
-  { value: 'custom', label: 'カスタム' },
-];
 
 function NewProjectDialog() {
   const dispatch = useDispatch();
@@ -34,8 +27,6 @@ function NewProjectDialog() {
   const [resolutionPreset, setResolutionPreset] = useState('1080x1920');
   const [customWidth, setCustomWidth] = useState(1080);
   const [customHeight, setCustomHeight] = useState(1920);
-  const [durationPreset, setDurationPreset] = useState(30);
-  const [customDuration, setCustomDuration] = useState(30);
   const [fps, setFps] = useState(30);
 
   if (!isOpen) return null;
@@ -52,15 +43,21 @@ function NewProjectDialog() {
       height = preset.height;
     }
 
-    // 尺の取得
-    const duration = durationPreset === 'custom' ? customDuration : durationPreset;
-    const totalFrames = duration * fps;
+    // デフォルトの尺（30秒 = 900フレーム @ 30fps）
+    const totalFrames = 30 * fps;
 
+    // タイムライン初期化
     dispatch(initializeProject({
       resolution: { width, height },
       totalFrames,
       fps,
     }));
+
+    // アセットクリア
+    dispatch(clearAssets());
+
+    // プロジェクト情報リセット
+    dispatch(newProject());
   };
 
   const handleSkip = () => {
@@ -114,34 +111,6 @@ function NewProjectDialog() {
             </div>
           )}
 
-          {/* 尺 */}
-          <div>
-            <label className="block text-sm text-ink-secondary mb-2">動画の長さ</label>
-            <Select
-              value={durationPreset}
-              onChange={(e) => {
-                const val = e.target.value;
-                setDurationPreset(val === 'custom' ? 'custom' : parseInt(val));
-              }}
-              options={durationPresets.map(p => ({ value: p.value, label: p.label }))}
-              className="w-full"
-            />
-          </div>
-
-          {/* カスタム尺 */}
-          {durationPreset === 'custom' && (
-            <div>
-              <label className="block text-xs text-ink-muted mb-1">秒数</label>
-              <Input
-                type="number"
-                value={customDuration}
-                onChange={(e) => setCustomDuration(parseInt(e.target.value) || 1)}
-                min={1}
-                max={600}
-              />
-            </div>
-          )}
-
           {/* FPS */}
           <div>
             <label className="block text-sm text-ink-secondary mb-2">フレームレート</label>
@@ -170,15 +139,9 @@ function NewProjectDialog() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span>尺:</span>
+                <span>フレームレート:</span>
                 <span className="text-ink-secondary">
-                  {durationPreset === 'custom' ? customDuration : durationPreset}秒
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>総フレーム数:</span>
-                <span className="text-ink-secondary">
-                  {(durationPreset === 'custom' ? customDuration : durationPreset) * fps} frames
+                  {fps} fps
                 </span>
               </div>
             </div>

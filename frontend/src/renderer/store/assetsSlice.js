@@ -77,6 +77,16 @@ const assetsSlice = createSlice({
         asset.thumbnail = thumbnail;
       }
     },
+    // プロジェクトファイルからアセット状態を復元
+    setAssets: (state, action) => {
+      state.items = action.payload || [];
+      state.selectedAssetId = null;
+    },
+    // アセットをクリア
+    clearAssets: (state) => {
+      state.items = [];
+      state.selectedAssetId = null;
+    },
   },
 });
 
@@ -88,6 +98,8 @@ export const {
   setFilter,
   setSearchQuery,
   updateAssetThumbnail,
+  setAssets,
+  clearAssets,
 } = assetsSlice.actions;
 
 export default assetsSlice.reducer;

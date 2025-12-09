@@ -789,6 +789,35 @@ const timelineSlice = createSlice({
       });
       state.selectedClipIds = allClipIds;
     },
+    // プロジェクトファイルからタイムライン状態を復元
+    loadTimeline: (state, action) => {
+      const { layers, layerOrder, totalFrames, resolution, fps } = action.payload;
+
+      // レイヤーとクリップを復元
+      if (layers) {
+        state.layers = layers;
+      }
+      if (layerOrder) {
+        state.layerOrder = layerOrder;
+      }
+      if (totalFrames !== undefined) {
+        state.totalFrames = totalFrames;
+      }
+      if (resolution) {
+        state.resolution = resolution;
+      }
+      if (fps !== undefined) {
+        state.fps = fps;
+      }
+
+      // 状態をリセット
+      state.currentFrame = 0;
+      state.selectedClipIds = [];
+      state.isPlaying = false;
+      state.history = [];
+      state.historyIndex = -1;
+      state.showNewProjectDialog = false;
+    },
   },
 });
 
@@ -833,6 +862,7 @@ export const {
   copyClips,
   pasteClips,
   selectAllClips,
+  loadTimeline,
 } = timelineSlice.actions;
 
 export default timelineSlice.reducer;

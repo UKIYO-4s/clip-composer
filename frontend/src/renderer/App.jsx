@@ -29,7 +29,11 @@ import {
   selectAllClips,
   selectCanUndo,
   selectCanRedo,
+  selectResolution,
+  selectFps,
+  loadTimeline,
 } from './store/timelineSlice';
+import { setAssets, clearAssets } from './store/assetsSlice';
 import {
   newProject,
   setProjectInfo,
@@ -61,6 +65,8 @@ function App() {
   const isDirty = useSelector(selectIsDirty);
   const canUndo = useSelector(selectCanUndo);
   const canRedo = useSelector(selectCanRedo);
+  const resolution = useSelector(selectResolution);
+  const fps = useSelector(selectFps);
 
   // エクスポートダイアログを開く
   const handleOpenExport = useCallback(() => {
@@ -91,14 +97,16 @@ function App() {
         created: new Date().toISOString(),
         modified: new Date().toISOString(),
         settings: {
-          fps: 30,
-          resolution: { width: 1920, height: 1080 },
+          fps: fps,
+          resolution: resolution,
         },
         assets: assets,
         timeline: {
           layers: layers,
           layerOrder: layerOrder,
           totalFrames: totalFrames,
+          resolution: resolution,
+          fps: fps,
         },
       };
 
@@ -118,7 +126,7 @@ function App() {
       console.error('Error saving project:', error);
       alert('プロジェクト保存エラー: ' + error.message);
     }
-  }, [dispatch, projectPath, projectName, layers, layerOrder, totalFrames, assets]);
+  }, [dispatch, projectPath, projectName, layers, layerOrder, totalFrames, assets, resolution, fps]);
 
   // 名前を付けて保存
   const handleSaveAsProject = useCallback(async () => {
@@ -140,14 +148,16 @@ function App() {
         created: new Date().toISOString(),
         modified: new Date().toISOString(),
         settings: {
-          fps: 30,
-          resolution: { width: 1920, height: 1080 },
+          fps: fps,
+          resolution: resolution,
         },
         assets: assets,
         timeline: {
           layers: layers,
           layerOrder: layerOrder,
           totalFrames: totalFrames,
+          resolution: resolution,
+          fps: fps,
         },
       };
 
@@ -168,7 +178,7 @@ function App() {
       console.error('Error saving project:', error);
       alert('プロジェクト保存エラー: ' + error.message);
     }
-  }, [dispatch, projectName, layers, layerOrder, totalFrames, assets]);
+  }, [dispatch, projectName, layers, layerOrder, totalFrames, assets, resolution, fps]);
 
   // プロジェクト読み込み処理
   const handleLoadProject = useCallback(async (filePath = null) => {
@@ -203,9 +213,6 @@ function App() {
       }
 
       const projectData = loadResult.data;
-
-      // stateを復元（実際の実装では各sliceのアクションを使用）
-      // ここでは簡易的な実装
       console.log('Project loaded:', projectData);
 
       // プロジェクト情報を更新
@@ -216,9 +223,25 @@ function App() {
         settings: projectData.settings,
         version: projectData.version,
       }));
-      dispatch(addRecentFile(loadPath));
 
-      alert('プロジェクトを読み込みました！（注: 完全な状態復元は未実装です）');
+      // タイムライン状態を復元
+      if (projectData.timeline) {
+        dispatch(loadTimeline({
+          layers: projectData.timeline.layers,
+          layerOrder: projectData.timeline.layerOrder,
+          totalFrames: projectData.timeline.totalFrames,
+          resolution: projectData.timeline.resolution || projectData.settings?.resolution,
+          fps: projectData.timeline.fps || projectData.settings?.fps,
+        }));
+      }
+
+      // アセット状態を復元
+      if (projectData.assets) {
+        dispatch(setAssets(projectData.assets));
+      }
+
+      dispatch(addRecentFile(loadPath));
+      console.log('Project fully restored:', loadPath);
     } catch (error) {
       console.error('Error loading project:', error);
       alert('プロジェクト読み込みエラー: ' + error.message);
