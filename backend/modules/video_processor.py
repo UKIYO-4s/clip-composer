@@ -5,6 +5,7 @@ VideoProcessor - 動画処理クラス
 
 from typing import Optional, List, Dict, Callable, Any
 import os
+import re
 import threading
 import math
 from PIL import Image, ImageDraw, ImageFont
@@ -420,29 +421,68 @@ class VideoProcessor:
                     print("警告: RandomLayerHandlerが利用できません")
 
             elif clip_type == 'variable_text':
-                # 可変テキスト: CSVからテキストを取得して表示
+                # 可変テキスト: テンプレート変数置換
+                # テンプレートと変数値を取得
+                template = clip_data.get('template', '')
+                variable_values = clip_data.get('variableValues', {})
+
+                # テンプレート変数を置換
+                text = template
+                for var_name, var_value in variable_values.items():
+                    placeholder = '{{' + var_name + '}}'
+                    text = text.replace(placeholder, str(var_value) if var_value else f'[{var_name}]')
+
+                # 未置換変数があれば警告
+                unmatched = re.findall(r'\{\{([^}]+)\}\}', text)
+                if unmatched:
+                    print(f"警告: 未置換の変数: {unmatched}")
+
+                # フォールバック
+                if not text:
+                    text = clip_data.get('textContent', 'Variable Text')
+
+                font_size = clip_data.get('fontSize', 48)
+                text_color = clip_data.get('textColor', '#ffffff')
+                bg_color = clip_data.get('bgColor', '#000000')
+                resolution = clip_data.get('resolution', (1920, 1080))
+
+                # テキスト画像の生成
+                text_image = self._create_text_image(text, font_size, text_color, bg_color, resolution)
+                clip = ImageClip(text_image, duration=duration)
+
+                # アニメーションの適用
+                animation = clip_data.get('animation')
+                if animation and animation.get('type') != 'none':
+                    clip = self._apply_text_animation(clip, animation, fps)
+
+            elif clip_type == 'csv_text_placeholder':
+                # CSV可変テキスト: CSVから指定カラムのテキストを取得
+                csv_column_name = clip_data.get('csvColumnName', '')
+
+                text = None
                 if VARIABLE_TEXT_AVAILABLE:
                     handler = get_variable_text_handler()
-                    text = handler.get_text_from_clip(clip_data)
+                    # clip_dataにcsvPathがあればそれを使用
+                    csv_path = clip_data.get('csvPath', '')
+                    if csv_path:
+                        text = handler.get_text(csv_path, csv_column_name)
 
-                    if text is None:
-                        text = clip_data.get('textContent', 'Variable Text')
+                if text is None:
+                    text = f'[{csv_column_name}]'  # プレースホルダー表示
 
-                    font_size = clip_data.get('fontSize', 48)
-                    text_color = clip_data.get('textColor', '#ffffff')
-                    bg_color = clip_data.get('bgColor', '#000000')
-                    resolution = clip_data.get('resolution', (1920, 1080))
+                font_size = clip_data.get('fontSize', 48)
+                text_color = clip_data.get('textColor', '#ffffff')
+                bg_color = clip_data.get('bgColor', '#000000')
+                resolution = clip_data.get('resolution', (1920, 1080))
 
-                    # テキスト画像の生成
-                    text_image = self._create_text_image(text, font_size, text_color, bg_color, resolution)
-                    clip = ImageClip(text_image, duration=duration)
+                # テキスト画像の生成
+                text_image = self._create_text_image(text, font_size, text_color, bg_color, resolution)
+                clip = ImageClip(text_image, duration=duration)
 
-                    # アニメーションの適用
-                    animation = clip_data.get('animation')
-                    if animation and animation.get('type') != 'none':
-                        clip = self._apply_text_animation(clip, animation, fps)
-                else:
-                    print("警告: VariableTextHandlerが利用できません")
+                # アニメーションの適用
+                animation = clip_data.get('animation')
+                if animation and animation.get('type') != 'none':
+                    clip = self._apply_text_animation(clip, animation, fps)
 
             elif clip_type == 'adjustment':
                 # 調整レイヤー: エフェクトを適用（透明クリップとして作成）
