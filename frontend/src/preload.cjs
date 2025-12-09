@@ -86,4 +86,10 @@ contextBridge.exposeInMainWorld('api', {
     // プロジェクトを読み込み
     load: (path) => ipcRenderer.invoke('load-project', { path }),
   },
+
+  // ファイルシステム操作
+  fs: {
+    // テキストファイル書き込み（CSVなど）
+    writeTextFile: (path, content) => ipcRenderer.invoke('write-text-file', { path, content }),
+  },
 });

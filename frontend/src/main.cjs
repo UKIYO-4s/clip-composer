@@ -408,3 +408,15 @@ ipcMain.handle('load-project', async (event, { path }) => {
     return { success: false, error: error.message };
   }
 });
+
+// テキストファイル書き込み（CSVテンプレートなど）
+ipcMain.handle('write-text-file', async (event, { path, content }) => {
+  const fs = require('fs').promises;
+  try {
+    await fs.writeFile(path, content, 'utf8');
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to write text file:', error);
+    return { success: false, error: error.message };
+  }
+});

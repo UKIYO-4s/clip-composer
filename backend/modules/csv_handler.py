@@ -80,36 +80,21 @@ class CSVHandler:
             tuple: (成功/失敗, エラーメッセージ)
         """
         try:
-            # 動画名の確認
+            # 動画名の確認（必須カラム）
             video_name = row_data.get('動画名', '').strip()
             if not video_name:
                 return False, "動画名が空です"
 
-            # ランダムフォルダパスの確認（存在する場合のみ）
-            for i in range(1, 4):  # ランダム1〜3
-                folder_key = f'ランダム{i}'
-                folder_path = row_data.get(folder_key, '').strip()
-
-                if folder_path:
-                    # パスが指定されている場合は存在確認
-                    if not os.path.exists(folder_path):
-                        return False, f"{folder_key}のパスが存在しません: {folder_path}"
-
-                    if not os.path.isdir(folder_path):
-                        return False, f"{folder_key}がフォルダではありません: {folder_path}"
-
-            # カラーコードの確認（指定されている場合のみ）
-            for i in range(1, 10):  # 可変テキスト1〜9
-                color_key = f'可変テキスト{i}カラー'
-                color = row_data.get(color_key, '').strip()
-
-                if color:
-                    # #で始まる6桁の16進数かチェック
-                    if not (color.startswith('#') and len(color) == 7):
-                        # 色名のチェック（基本的な色名を許可）
-                        valid_colors = ['white', 'black', 'red', 'green', 'blue', 'yellow', 'cyan', 'magenta']
-                        if color.lower() not in valid_colors:
-                            return False, f"{color_key}の形式が不正です: {color}（#RRGGBB形式または色名を使用）"
+            # フォルダパスの確認（値がフォルダパスっぽい場合は存在確認）
+            for key, value in row_data.items():
+                if not value:
+                    continue
+                value = value.strip()
+                # パス区切り文字を含む場合はフォルダパスとして検証
+                if ('/' in value or '\\' in value) and not value.startswith('#'):
+                    if os.path.exists(value) and not os.path.isdir(value) and not os.path.isfile(value):
+                        # 存在しないパス
+                        return False, f"{key}のパスが存在しません: {value}"
 
             return True, None
 
@@ -118,44 +103,20 @@ class CSVHandler:
 
     def parse_row_to_overrides(self, row_data: Dict[str, str]) -> Dict[str, Any]:
         """
-        CSV行データをタイムライン上書き用データに変換
+        CSV行データをそのままオーバーライドデータとして返す
+        （カラム名をキーとして使用）
 
         Args:
             row_data: CSVの行データ
 
         Returns:
-            dict: タイムライン上書き用データ
+            dict: CSVカラム名をキーとしたデータ
         """
+        # CSVの全カラムをそのままオーバーライドデータとして使用
         overrides = {}
-
-        # ランダムフォルダパス（ランダム1〜3）
-        for i in range(1, 4):
-            folder_key = f'ランダム{i}'
-            folder_path = row_data.get(folder_key, '').strip()
-            if folder_path:
-                overrides[f'random_folder_{i}'] = folder_path
-
-        # 可変テキスト（可変テキスト1〜9）
-        for i in range(1, 10):
-            content_key = f'可変テキスト{i}内容'
-            font_key = f'可変テキスト{i}フォント'
-            color_key = f'可変テキスト{i}カラー'
-
-            content = row_data.get(content_key, '').strip()
-            font = row_data.get(font_key, '').strip()
-            color = row_data.get(color_key, '').strip()
-
-            if content or font or color:
-                text_override = {}
-                if content:
-                    text_override['text'] = content
-                if font:
-                    text_override['font'] = font
-                if color:
-                    text_override['color'] = color
-
-                overrides[f'variable_text_{i}'] = text_override
-
+        for key, value in row_data.items():
+            if value:
+                overrides[key] = value.strip()
         return overrides
 
     def get_total_rows(self) -> int:
@@ -322,7 +283,7 @@ class CSVHandler:
 
         Args:
             timeline_data: ベースとなるタイムラインデータ
-            overrides: 上書きデータ
+            overrides: CSVカラム名をキーとした上書きデータ
 
         Returns:
             dict: 上書き後のタイムラインデータ
@@ -340,30 +301,51 @@ class CSVHandler:
             for clip in clips:
                 clip_type = clip.get('type')
 
-                # ランダムフォルダの適用（videoまたはimageタイプ）
-                if clip_type in ['video', 'image']:
-                    # クリップにランダム識別子があれば対応するフォルダから選択
-                    random_id = clip.get('randomId')  # 例: 'random_1', 'random_2', etc
-                    if random_id and random_id in overrides:
-                        folder_path = overrides[random_id]
-                        # フォルダからランダムにファイルを選択
-                        selected_file = self._select_random_file(folder_path, clip_type)
-                        if selected_file:
-                            clip['filePath'] = selected_file
+                # CSVテキストプレースホルダー: csvColumnNameでCSVカラムを参照
+                if clip_type == 'csv_text_placeholder':
+                    csv_column = clip.get('csvColumnName', '')
+                    if csv_column and csv_column in overrides:
+                        # CSVのテキスト値を設定
+                        clip['text'] = overrides[csv_column]
+                        clip['csvResolvedText'] = overrides[csv_column]
+                        print(f"CSVテキスト適用: {csv_column} = {overrides[csv_column]}")
 
-                # 可変テキストの適用（textタイプ）
-                if clip_type == 'text':
-                    # クリップに可変テキスト識別子があれば対応するテキストを適用
-                    variable_id = clip.get('variableId')  # 例: 'variable_text_1', 'variable_text_2', etc
-                    if variable_id and variable_id in overrides:
-                        text_data = overrides[variable_id]
+                # 可変テキスト: テンプレート内の変数をCSVから置換
+                elif clip_type == 'variable_text':
+                    template = clip.get('template', '')
+                    variable_values = clip.get('variableValues', {}).copy()
 
-                        if 'text' in text_data:
-                            clip['text'] = text_data['text']
-                        if 'font' in text_data:
-                            clip['font'] = text_data['font']
-                        if 'color' in text_data:
-                            clip['color'] = text_data['color']
+                    # CSVからの値で変数を上書き
+                    variables = clip.get('variables', [])
+                    for var_name in variables:
+                        if var_name in overrides:
+                            variable_values[var_name] = overrides[var_name]
+                            print(f"可変テキスト変数置換: {var_name} = {overrides[var_name]}")
+
+                    clip['variableValues'] = variable_values
+
+                # ランダムレイヤー: randomColumnNameでCSVフォルダパスを参照
+                elif clip_type == 'random_layer':
+                    random_column = clip.get('randomColumnName', '')
+                    if random_column and random_column in overrides:
+                        folder_path = overrides[random_column]
+                        if os.path.isdir(folder_path):
+                            # フォルダからランダムにファイルを選択
+                            selected_file = self._select_random_file(folder_path, 'image')
+                            if selected_file:
+                                clip['selectedFilePath'] = selected_file
+                                print(f"ランダムレイヤー適用: {random_column} = {selected_file}")
+
+                # 通常のビデオ/画像: folderColumnNameがあればフォルダパスを参照
+                elif clip_type in ['video', 'image']:
+                    folder_column = clip.get('folderColumnName', '')
+                    if folder_column and folder_column in overrides:
+                        folder_path = overrides[folder_column]
+                        if os.path.isdir(folder_path):
+                            selected_file = self._select_random_file(folder_path, clip_type)
+                            if selected_file:
+                                clip['filePath'] = selected_file
+                                print(f"メディア適用: {folder_column} = {selected_file}")
 
         return modified_timeline
 

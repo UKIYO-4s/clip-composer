@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   closeExportDialog,
@@ -22,6 +22,47 @@ import { selectResolution, selectFps } from '../../store/timelineSlice';
 import ExportProgress from './ExportProgress';
 import { Button, Input, Select, IconButton } from '../ui';
 
+// CSVセル値のエスケープ処理
+const escapeCsvValue = (value) => {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  // カンマ、引用符、改行を含む場合は引用符で囲む
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
+
+// タイムラインから可変要素を抽出してCSVカラムを生成
+const extractCsvColumns = (timeline) => {
+  const columns = new Set(['動画名']); // 必須カラム
+
+  const { layers } = timeline;
+
+  Object.values(layers).forEach((layer) => {
+    layer.clips.forEach((clip) => {
+      // CSVテキストプレースホルダー
+      if (clip.type === 'csv_text_placeholder' && clip.csvColumnName) {
+        columns.add(clip.csvColumnName);
+      }
+
+      // 可変テキスト（テンプレート内の変数）
+      if (clip.type === 'variable_text' && clip.variables) {
+        clip.variables.forEach((varName) => {
+          columns.add(varName);
+        });
+      }
+
+      // ランダムレイヤー
+      if (clip.type === 'random_layer' && clip.randomColumnName) {
+        columns.add(clip.randomColumnName);
+      }
+    });
+  });
+
+  return Array.from(columns);
+};
+
 function ExportDialog() {
   const dispatch = useDispatch();
   const exportState = useSelector(selectExportState);
@@ -42,6 +83,9 @@ function ExportDialog() {
     csvPath,
     batchProgress
   } = exportState;
+
+  // タイムラインから抽出したCSVカラム（hooksは条件付きreturnの前に呼ぶ必要がある）
+  const csvColumns = useMemo(() => extractCsvColumns(timeline), [timeline]);
 
   // ダイアログが開いていなければ何も表示しない
   if (!isDialogOpen) return null;
@@ -94,6 +138,44 @@ function ExportDialog() {
   const handleModeChange = (mode) => {
     dispatch(setExportMode(mode));
     setOutputPath('');
+  };
+
+  // CSVテンプレートをエクスポート
+  const handleExportTemplate = async () => {
+    try {
+      const result = await window.api.saveFile({
+        defaultPath: 'template.csv',
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      });
+
+      if (result.canceled || !result.filePath) {
+        return;
+      }
+
+      // CSVヘッダー行を生成（エスケープ処理付き）
+      const headerRow = csvColumns.map(escapeCsvValue).join(',');
+      // サンプル行を生成
+      const sampleRow = csvColumns.map((col) => {
+        if (col === '動画名') return escapeCsvValue('video_001');
+        return escapeCsvValue(`[${col}の値]`);
+      }).join(',');
+
+      // BOM付きUTF-8でExcelでの文字化けを防ぐ
+      const bom = '\uFEFF';
+      const csvContent = `${bom}${headerRow}\n${sampleRow}\n`;
+
+      // ファイルに書き込み（Electron API経由）
+      const writeResult = await window.api.fs.writeTextFile(result.filePath, csvContent);
+
+      if (writeResult.success) {
+        alert(`CSVテンプレートを保存しました:\n${result.filePath}\n\nカラム: ${csvColumns.join(', ')}`);
+      } else {
+        alert('CSVテンプレートの保存に失敗しました');
+      }
+    } catch (err) {
+      console.error('Failed to export CSV template:', err);
+      alert('CSVテンプレートの保存中にエラーが発生しました');
+    }
   };
 
   // 解像度取得（プロジェクト設定から）
@@ -345,25 +427,59 @@ function ExportDialog() {
 
               {/* CSV一括書き出しの場合のCSV選択 */}
               {exportMode === 'batch' && (
-                <div>
-                  <label className="mb-1 block text-sm text-ink-secondary">CSVファイル</label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      value={csvPath || ''}
-                      placeholder="CSVファイルを選択..."
-                      readOnly
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="subtle"
-                      size="md"
-                      onClick={handleSelectCsv}
-                    >
-                      参照
-                    </Button>
+                <>
+                  {/* 検出されたCSVカラム */}
+                  <div className="p-3 rounded bg-surface-sunken border border-line">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs text-ink-muted">検出された可変要素</div>
+                      <Button
+                        variant="subtle"
+                        size="sm"
+                        onClick={handleExportTemplate}
+                        disabled={csvColumns.length <= 1}
+                      >
+                        テンプレート出力
+                      </Button>
+                    </div>
+                    {csvColumns.length > 1 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {csvColumns.map((col) => (
+                          <span
+                            key={col}
+                            className="px-2 py-0.5 text-xs rounded bg-accent-blue/20 text-accent-blue"
+                          >
+                            {col}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-ink-muted">
+                        可変テキストやランダムレイヤーが検出されませんでした
+                      </div>
+                    )}
                   </div>
-                </div>
+
+                  {/* CSVファイル選択 */}
+                  <div>
+                    <label className="mb-1 block text-sm text-ink-secondary">CSVファイル</label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={csvPath || ''}
+                        placeholder="CSVファイルを選択..."
+                        readOnly
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="subtle"
+                        size="md"
+                        onClick={handleSelectCsv}
+                      >
+                        参照
+                      </Button>
+                    </div>
+                  </div>
+                </>
               )}
 
               {/* プロジェクト設定（読み取り専用） */}

@@ -9,6 +9,7 @@ import re
 import threading
 import math
 from PIL import Image, ImageDraw, ImageFont
+from modules.font_utils import get_font
 import numpy as np
 
 try:
@@ -388,8 +389,13 @@ class VideoProcessor:
                 if RANDOM_LAYER_AVAILABLE:
                     from .random_layer import is_video_file, is_image_file, is_gif_file
 
-                    handler = get_random_handler()
-                    selected_file = handler.select_media(clip_data)
+                    # CSV一括処理で事前選択されたファイルがあればそれを使用
+                    selected_file = clip_data.get('selectedFilePath')
+
+                    if not selected_file:
+                        # 通常のランダム選択
+                        handler = get_random_handler()
+                        selected_file = handler.select_media(clip_data)
 
                     if selected_file and os.path.exists(selected_file):
                         if is_gif_file(selected_file):
@@ -472,16 +478,11 @@ class VideoProcessor:
                     clip = self._apply_text_animation(clip, animation, fps)
 
             elif clip_type == 'csv_text_placeholder':
-                # CSV可変テキスト: CSVから指定カラムのテキストを取得
+                # CSV可変テキスト: CSVから解決されたテキストを使用
                 csv_column_name = clip_data.get('csvColumnName', '')
 
-                text = None
-                if VARIABLE_TEXT_AVAILABLE:
-                    handler = get_variable_text_handler()
-                    # clip_dataにcsvPathがあればそれを使用
-                    csv_path = clip_data.get('csvPath', '')
-                    if csv_path:
-                        text = handler.get_text(csv_path, csv_column_name)
+                # CSV一括処理で設定された解決済みテキストを優先
+                text = clip_data.get('csvResolvedText') or clip_data.get('text')
 
                 if text is None:
                     text = f'[{csv_column_name}]'  # プレースホルダー表示
@@ -767,17 +768,8 @@ class VideoProcessor:
         img = Image.new('RGBA', resolution, bg_rgba)
         draw = ImageDraw.Draw(img)
 
-        # フォントの読み込み（システムフォントを使用）
-        try:
-            # macOSの場合
-            font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
-        except:
-            try:
-                # Linuxの場合
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
-            except:
-                # デフォルトフォント
-                font = ImageFont.load_default()
+        # フォントの読み込み（日本語対応フォントを使用）
+        font = get_font(font_size)
 
         # テキストのサイズを取得
         bbox = draw.textbbox((0, 0), text, font=font)
