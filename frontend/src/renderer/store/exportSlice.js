@@ -10,9 +10,9 @@ const initialState = {
   error: null,
   outputPath: null,
   settings: {
-    resolution: '1080p',
-    customWidth: 1920,
-    customHeight: 1080,
+    resolution: '1080x1920',  // 縦動画デフォルト（TikTok/Reels/Shorts）
+    customWidth: 1080,
+    customHeight: 1920,
     fps: 30,
     quality: 'medium',
     codec: 'libx264',
@@ -31,9 +31,15 @@ const initialState = {
 
 // 解像度プリセット
 export const resolutionPresets = {
+  // 横動画
   '1080p': { width: 1920, height: 1080 },
   '720p': { width: 1280, height: 720 },
   '480p': { width: 854, height: 480 },
+  // 縦動画（TikTok/Reels/Shorts）
+  '1080x1920': { width: 1080, height: 1920 },
+  '720x1280': { width: 720, height: 1280 },
+  // 正方形
+  '1080x1080': { width: 1080, height: 1080 },
   'custom': null,
 };
 

@@ -8,7 +8,9 @@ import PropertyPanel from './components/PropertyPanel';
 import AssetPanel from './components/AssetPanel';
 import FileMenu from './components/Menu/FileMenu';
 import ExportDialog from './components/ExportDialog';
+import NewProjectDialog from './components/NewProjectDialog';
 import { openExportDialog } from './store/exportSlice';
+import { setShowNewProjectDialog } from './store/timelineSlice';
 import { Button } from './components/ui';
 import {
   removeClip,
@@ -233,8 +235,8 @@ function App() {
       }
     }
 
-    dispatch(newProject());
-    console.log('New project created');
+    // 新規プロジェクトダイアログを表示
+    dispatch(setShowNewProjectDialog(true));
   }, [dispatch, isDirty]);
 
   // 未保存の変更がある場合の警告
@@ -618,6 +620,9 @@ function App() {
 
         {/* Export Dialog */}
         <ExportDialog />
+
+        {/* New Project Dialog */}
+        <NewProjectDialog />
       </div>
     </DndProvider>
   );

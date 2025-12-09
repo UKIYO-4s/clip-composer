@@ -159,9 +159,16 @@ def handle_render(params: dict, handler: IPCHandler):
 
     processor = VideoProcessor()
 
-    # 進捗コールバック
-    def progress_callback(progress: float, message: str = ""):
-        handler.send_progress(progress, message)
+    # 進捗コールバック（video_processorからの辞書形式を処理）
+    def progress_callback(progress_data):
+        if isinstance(progress_data, dict):
+            percentage = progress_data.get('percentage', 0)
+            status = progress_data.get('status', 'rendering')
+            message = progress_data.get('message', f'レンダリング中... {percentage:.1f}%')
+            handler.send_progress(percentage, message, progress_data)
+        else:
+            # 後方互換: 数値のみの場合
+            handler.send_progress(progress_data, 'レンダリング中...')
 
     result = processor.render(
         timeline_data=timeline_data,

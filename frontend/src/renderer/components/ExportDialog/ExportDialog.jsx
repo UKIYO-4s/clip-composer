@@ -17,8 +17,8 @@ import {
   cancelExport,
   selectExportState,
   selectExportSettings,
-  resolutionPresets,
 } from '../../store/exportSlice';
+import { selectResolution, selectFps } from '../../store/timelineSlice';
 import ExportProgress from './ExportProgress';
 import { Button, Input, Select, IconButton } from '../ui';
 
@@ -27,6 +27,8 @@ function ExportDialog() {
   const exportState = useSelector(selectExportState);
   const settings = useSelector(selectExportSettings);
   const timeline = useSelector((state) => state.timeline);
+  const projectResolution = useSelector(selectResolution);
+  const projectFps = useSelector(selectFps);
 
   const [outputPath, setOutputPath] = useState('');
   const [startTime, setStartTime] = useState(null);
@@ -94,12 +96,9 @@ function ExportDialog() {
     setOutputPath('');
   };
 
-  // 解像度取得
+  // 解像度取得（プロジェクト設定から）
   const getResolution = () => {
-    if (settings.resolution === 'custom') {
-      return { width: settings.customWidth, height: settings.customHeight };
-    }
-    return resolutionPresets[settings.resolution];
+    return projectResolution;
   };
 
   // 書き出し開始
@@ -130,7 +129,7 @@ function ExportDialog() {
 
     const options = {
       resolution: [resolution.width, resolution.height],
-      fps: settings.fps,
+      fps: projectFps,
       codec: settings.codec,
       quality: settings.quality,
     };
@@ -192,7 +191,7 @@ function ExportDialog() {
 
     const options = {
       resolution: [resolution.width, resolution.height],
-      fps: settings.fps,
+      fps: projectFps,
       codec: settings.codec,
       quality: settings.quality,
     };
@@ -367,52 +366,20 @@ function ExportDialog() {
                 </div>
               )}
 
-              {/* 解像度 */}
-              <Select
-                label="解像度"
-                value={settings.resolution}
-                onChange={(e) => handleSettingChange('resolution', e.target.value)}
-                options={[
-                  { value: '1080p', label: '1080p (1920 x 1080)' },
-                  { value: '720p', label: '720p (1280 x 720)' },
-                  { value: '480p', label: '480p (854 x 480)' },
-                  { value: 'custom', label: 'カスタム' },
-                ]}
-                className="w-full"
-              />
-
-              {/* カスタム解像度 */}
-              {settings.resolution === 'custom' && (
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    label="幅"
-                    value={settings.customWidth}
-                    onChange={(e) => handleSettingChange('customWidth', parseInt(e.target.value))}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    label="高さ"
-                    value={settings.customHeight}
-                    onChange={(e) => handleSettingChange('customHeight', parseInt(e.target.value))}
-                    className="flex-1"
-                  />
+              {/* プロジェクト設定（読み取り専用） */}
+              <div className="p-3 rounded bg-surface-sunken border border-line">
+                <div className="text-xs text-ink-muted mb-2">プロジェクト設定</div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-ink-secondary">解像度:</span>
+                    <span className="text-white font-medium">{projectResolution.width} × {projectResolution.height}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-ink-secondary">フレームレート:</span>
+                    <span className="text-white font-medium">{projectFps} fps</span>
+                  </div>
                 </div>
-              )}
-
-              {/* フレームレート */}
-              <Select
-                label="フレームレート"
-                value={settings.fps}
-                onChange={(e) => handleSettingChange('fps', parseInt(e.target.value))}
-                options={[
-                  { value: 30, label: '30 fps' },
-                  { value: 60, label: '60 fps' },
-                  { value: 24, label: '24 fps' },
-                ]}
-                className="w-full"
-              />
+              </div>
 
               {/* 品質 */}
               <Select

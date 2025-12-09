@@ -171,6 +171,11 @@ const restoreSnapshot = (state, snapshot) => {
 };
 
 const initialState = {
+  // プロジェクト設定
+  resolution: { width: 1080, height: 1920 },  // 縦動画デフォルト
+  totalFrames: 900, // 30fps * 30s
+  fps: 30,
+
   layers: {
     V2: { id: 'V2', name: 'Video 2', type: 'video', clips: sampleClips.V2 },
     V1: { id: 'V1', name: 'Video 1', type: 'video', clips: sampleClips.V1 },
@@ -179,8 +184,6 @@ const initialState = {
   },
   layerOrder: ['V2', 'V1', 'S2', 'S1'],
   currentFrame: 0,
-  totalFrames: 900, // 30fps * 30s
-  fps: 30,
   pixelsPerFrame: 2,
   selectedClipIds: [],
   isPlaying: false,
@@ -194,12 +197,43 @@ const initialState = {
 
   // クリップボード（コピー/ペースト用）
   clipboard: [],
+
+  // 新規プロジェクトダイアログ
+  showNewProjectDialog: true,  // 起動時に表示
 };
 
 const timelineSlice = createSlice({
   name: 'timeline',
   initialState,
   reducers: {
+    // プロジェクト設定
+    initializeProject: (state, action) => {
+      const { resolution, totalFrames, fps } = action.payload;
+      state.resolution = resolution;
+      state.totalFrames = totalFrames;
+      state.fps = fps || 30;
+      state.showNewProjectDialog = false;
+      // クリップをクリア
+      Object.keys(state.layers).forEach(layerId => {
+        state.layers[layerId].clips = [];
+      });
+      state.currentFrame = 0;
+      state.selectedClipIds = [];
+      state.history = [];
+      state.historyIndex = -1;
+    },
+    setShowNewProjectDialog: (state, action) => {
+      state.showNewProjectDialog = action.payload;
+    },
+    setResolution: (state, action) => {
+      state.resolution = action.payload;
+    },
+    setTotalFrames: (state, action) => {
+      state.totalFrames = action.payload;
+    },
+    setFps: (state, action) => {
+      state.fps = action.payload;
+    },
     setCurrentFrame: (state, action) => {
       state.currentFrame = action.payload;
     },
@@ -759,6 +793,13 @@ const timelineSlice = createSlice({
 });
 
 export const {
+  // プロジェクト設定
+  initializeProject,
+  setShowNewProjectDialog,
+  setResolution,
+  setTotalFrames,
+  setFps,
+  // タイムライン
   setCurrentFrame,
   addClip,
   removeClip,
@@ -797,6 +838,8 @@ export const {
 export default timelineSlice.reducer;
 
 // セレクター
+export const selectResolution = (state) => state.timeline.resolution;
+export const selectShowNewProjectDialog = (state) => state.timeline.showNewProjectDialog;
 export const selectCurrentFrame = (state) => state.timeline.currentFrame;
 export const selectTotalFrames = (state) => state.timeline.totalFrames;
 export const selectFps = (state) => state.timeline.fps;

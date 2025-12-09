@@ -100,25 +100,25 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-64 bg-surface-highest border border-line rounded shadow-lg z-50">
+        <div className="absolute top-full left-0 mt-1 min-w-max bg-surface-highest border border-line rounded shadow-lg z-50">
           {/* New Project */}
           <button
             onClick={handleNewProject}
-            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
+            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary whitespace-nowrap"
           >
-            <FilePlus className="w-4 h-4 text-ink-muted" />
+            <FilePlus className="w-4 h-4 text-ink-muted flex-shrink-0" />
             <span className="flex-1">新規プロジェクト</span>
-            <span className="text-xs text-ink-muted">Ctrl+N</span>
+            <span className="text-xs text-ink-muted ml-4">Ctrl+N</span>
           </button>
 
           {/* Open Project */}
           <button
             onClick={handleOpenProject}
-            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
+            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary whitespace-nowrap"
           >
-            <FolderOpen className="w-4 h-4 text-ink-muted" />
+            <FolderOpen className="w-4 h-4 text-ink-muted flex-shrink-0" />
             <span className="flex-1">プロジェクトを開く</span>
-            <span className="text-xs text-ink-muted">Ctrl+O</span>
+            <span className="text-xs text-ink-muted ml-4">Ctrl+O</span>
           </button>
 
           <div className="border-t border-line my-1"></div>
@@ -126,21 +126,21 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
           {/* Save */}
           <button
             onClick={handleSave}
-            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
+            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary whitespace-nowrap"
           >
-            <Save className="w-4 h-4 text-ink-muted" />
+            <Save className="w-4 h-4 text-ink-muted flex-shrink-0" />
             <span className="flex-1">保存{isDirty ? ' *' : ''}</span>
-            <span className="text-xs text-ink-muted">Ctrl+S</span>
+            <span className="text-xs text-ink-muted ml-4">Ctrl+S</span>
           </button>
 
           {/* Save As */}
           <button
             onClick={handleSaveAs}
-            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
+            className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary whitespace-nowrap"
           >
-            <Save className="w-4 h-4 text-ink-muted" />
+            <Save className="w-4 h-4 text-ink-muted flex-shrink-0" />
             <span className="flex-1">名前を付けて保存...</span>
-            <span className="text-xs text-ink-muted">Ctrl+Shift+S</span>
+            <span className="text-xs text-ink-muted ml-4">Ctrl+Shift+S</span>
           </button>
 
           {/* Recent Files */}
@@ -150,11 +150,11 @@ const FileMenu = ({ onSaveProject, onLoadProject, onNewProject, onSaveAsProject 
               <div className="relative">
                 <button
                   onMouseEnter={() => setRecentFilesOpen(true)}
-                  className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary"
+                  className="w-full px-4 py-2 text-left hover:bg-state-hover flex items-center gap-3 text-sm transition-colors text-ink-primary whitespace-nowrap"
                 >
-                  <Clock className="w-4 h-4 text-ink-muted" />
+                  <Clock className="w-4 h-4 text-ink-muted flex-shrink-0" />
                   <span className="flex-1">最近使用したファイル</span>
-                  <ChevronRight className="w-4 h-4 text-ink-muted" />
+                  <ChevronRight className="w-4 h-4 text-ink-muted flex-shrink-0" />
                 </button>
 
                 {/* Recent files submenu */}

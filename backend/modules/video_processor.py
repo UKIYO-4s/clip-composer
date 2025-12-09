@@ -183,6 +183,12 @@ class VideoProcessor:
             print(f"  FPS: {fps}, Duration: {duration}s, Total Frames: {total_frames}")
             print(f"  Layers: {len(layers)}, Order: {layer_order}")
 
+            # 解像度の取得
+            resolution = render_options.get('resolution', (1920, 1080))
+            # リスト形式の場合はタプルに変換
+            if isinstance(resolution, list):
+                resolution = tuple(resolution)
+
             # レイヤー別にクリップを準備
             video_clips = []
             audio_clips = []
@@ -197,7 +203,7 @@ class VideoProcessor:
                     if self._cancel_flag:
                         raise Exception("レンダリングがキャンセルされました")
 
-                    clip = self._create_video_clip(clip_data, fps)
+                    clip = self._create_video_clip(clip_data, fps, resolution)
                     if clip:
                         video_clips.append(clip)
 
@@ -270,7 +276,6 @@ class VideoProcessor:
                 threads=render_options['threads'],
                 bitrate=render_options['bitrate'],
                 logger=None,  # 標準のログ出力を抑制
-                progress_bar=False,  # プログレスバーを無効化
             )
 
             # レンダリング完了
@@ -294,7 +299,13 @@ class VideoProcessor:
                 clip.close()
 
             print(f"レンダリング完了: {output_path}")
-            return True
+            return {
+                'success': True,
+                'output_path': output_path,
+                'duration': duration,
+                'fps': fps,
+                'total_frames': total_frames
+            }
 
         except Exception as e:
             with self._progress_lock:
@@ -310,15 +321,18 @@ class VideoProcessor:
                 })
 
             print(f"レンダリングエラー: {e}")
-            return False
+            import traceback
+            traceback.print_exc()
+            raise Exception(f"レンダリングエラー: {e}")
 
-    def _create_video_clip(self, clip_data: Dict[str, Any], fps: float):
+    def _create_video_clip(self, clip_data: Dict[str, Any], fps: float, resolution: tuple = (1920, 1080)):
         """
         ビデオクリップを作成
 
         Args:
             clip_data: クリップデータ
             fps: フレームレート
+            resolution: 出力解像度
 
         Returns:
             MoviePy clip object or None
@@ -326,8 +340,10 @@ class VideoProcessor:
         try:
             clip_type = clip_data.get('type')
             start_frame = clip_data.get('startFrame', 0)
-            end_frame = clip_data.get('endFrame', 0)
-            duration = (end_frame - start_frame) / fps
+            # endFrameまたはdurationFramesから計算
+            duration_frames = clip_data.get('durationFrames', 0)
+            end_frame = clip_data.get('endFrame', start_frame + duration_frames)
+            duration = (end_frame - start_frame) / fps if end_frame > start_frame else duration_frames / fps
             start_time = start_frame / fps
 
             clip = None
@@ -356,10 +372,10 @@ class VideoProcessor:
                 font_size = clip_data.get('fontSize', 48)
                 text_color = clip_data.get('textColor', '#ffffff')
                 bg_color = clip_data.get('bgColor', '#000000')
-                resolution = clip_data.get('resolution', (1920, 1080))
+                clip_resolution = clip_data.get('resolution', resolution)
 
                 # テキスト画像の生成
-                text_image = self._create_text_image(text, font_size, text_color, bg_color, resolution)
+                text_image = self._create_text_image(text, font_size, text_color, bg_color, clip_resolution)
                 clip = ImageClip(text_image, duration=duration)
 
                 # アニメーションの適用
@@ -444,10 +460,10 @@ class VideoProcessor:
                 font_size = clip_data.get('fontSize', 48)
                 text_color = clip_data.get('textColor', '#ffffff')
                 bg_color = clip_data.get('bgColor', '#000000')
-                resolution = clip_data.get('resolution', (1920, 1080))
+                clip_resolution = clip_data.get('resolution', resolution)
 
                 # テキスト画像の生成
-                text_image = self._create_text_image(text, font_size, text_color, bg_color, resolution)
+                text_image = self._create_text_image(text, font_size, text_color, bg_color, clip_resolution)
                 clip = ImageClip(text_image, duration=duration)
 
                 # アニメーションの適用
@@ -473,10 +489,10 @@ class VideoProcessor:
                 font_size = clip_data.get('fontSize', 48)
                 text_color = clip_data.get('textColor', '#ffffff')
                 bg_color = clip_data.get('bgColor', '#000000')
-                resolution = clip_data.get('resolution', (1920, 1080))
+                clip_resolution = clip_data.get('resolution', resolution)
 
                 # テキスト画像の生成
-                text_image = self._create_text_image(text, font_size, text_color, bg_color, resolution)
+                text_image = self._create_text_image(text, font_size, text_color, bg_color, clip_resolution)
                 clip = ImageClip(text_image, duration=duration)
 
                 # アニメーションの適用
@@ -488,10 +504,10 @@ class VideoProcessor:
                 # 調整レイヤー: エフェクトを適用（透明クリップとして作成）
                 if ADJUSTMENT_LAYER_AVAILABLE:
                     handler = get_adjustment_handler()
-                    resolution = clip_data.get('resolution', (1920, 1080))
+                    clip_resolution = clip_data.get('resolution', resolution)
 
                     # 調整レイヤーは透明なクリップとして作成
-                    clip = handler.create_adjustment_layer(clip_data, duration, resolution)
+                    clip = handler.create_adjustment_layer(clip_data, duration, clip_resolution)
 
                     # 注意: 実際のエフェクト適用はCompositeVideoClip時に
                     # 下のレイヤーに対して行う必要がある（別途実装）
