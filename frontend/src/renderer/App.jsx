@@ -12,11 +12,21 @@ import { openExportDialog } from './store/exportSlice';
 import { Button } from './components/ui';
 import {
   removeClip,
+  removeClips,
   splitClip,
   duplicateClip,
+  duplicateClipsWithDelta,
   setCurrentFrame,
   setIsPlaying,
   setLoopEnabled,
+  saveToHistory,
+  undo,
+  redo,
+  copyClips,
+  pasteClips,
+  selectAllClips,
+  selectCanUndo,
+  selectCanRedo,
 } from './store/timelineSlice';
 import {
   newProject,
@@ -47,6 +57,8 @@ function App() {
   const projectName = useSelector(selectProjectName);
   const projectPath = useSelector(selectProjectPath);
   const isDirty = useSelector(selectIsDirty);
+  const canUndo = useSelector(selectCanUndo);
+  const canRedo = useSelector(selectCanRedo);
 
   // エクスポートダイアログを開く
   const handleOpenExport = useCallback(() => {
@@ -285,6 +297,49 @@ function App() {
         return;
       }
 
+      // Cmd/Ctrl+Z: Undo
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        if (canUndo) {
+          dispatch(undo());
+        }
+        return;
+      }
+
+      // Cmd/Ctrl+Shift+Z または Cmd/Ctrl+Y: Redo
+      if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') ||
+          ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+        e.preventDefault();
+        if (canRedo) {
+          dispatch(redo());
+        }
+        return;
+      }
+
+      // Cmd/Ctrl+C: コピー
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        if (selectedClipIds.length > 0) {
+          dispatch(copyClips({ clipIds: selectedClipIds }));
+        }
+        return;
+      }
+
+      // Cmd/Ctrl+V: ペースト
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        dispatch(saveToHistory());
+        dispatch(pasteClips({ targetFrame: currentFrame }));
+        return;
+      }
+
+      // Cmd/Ctrl+A: 全選択
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault();
+        dispatch(selectAllClips());
+        return;
+      }
+
       // トランスポートコントロール（常に有効）
       // Space: 再生/停止
       if (e.key === ' ') {
@@ -355,7 +410,12 @@ function App() {
       // Delete/Backspace: クリップ削除
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        dispatch(removeClip({ layerId: selectedLayerId, clipId: selectedClipId }));
+        dispatch(saveToHistory());
+        if (selectedClipIds.length > 1) {
+          dispatch(removeClips({ clipIds: selectedClipIds }));
+        } else if (selectedClipId && selectedLayerId) {
+          dispatch(removeClip({ layerId: selectedLayerId, clipId: selectedClipId }));
+        }
       }
 
       // S: 再生ヘッド位置で分割
@@ -376,7 +436,102 @@ function App() {
       // Ctrl+D (Mac: Cmd+D): クリップ複製
       if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
         e.preventDefault();
-        dispatch(duplicateClip({ layerId: selectedLayerId, clipId: selectedClipId }));
+        dispatch(saveToHistory());
+
+        if (selectedClipIds.length > 1) {
+          // 複数選択時: 全クリップを直後に複製
+          const clipMoves = [];
+          let maxEndFrame = 0;
+
+          // 選択されたクリップの情報を収集
+          Object.entries(layers).forEach(([layerId, layer]) => {
+            layer.clips.forEach(clip => {
+              if (selectedClipIds.includes(clip.id)) {
+                clipMoves.push({
+                  fromLayerId: layerId,
+                  clipId: clip.id,
+                  originalStartFrame: clip.startFrame,
+                });
+                const endFrame = clip.startFrame + clip.durationFrames;
+                if (endFrame > maxEndFrame) {
+                  maxEndFrame = endFrame;
+                }
+              }
+            });
+          });
+
+          // 最も早い開始フレームを計算
+          const minStartFrame = Math.min(...clipMoves.map(c => c.originalStartFrame));
+          // 複製先は全クリップの終了位置の直後
+          const deltaFrame = maxEndFrame - minStartFrame;
+
+          dispatch(duplicateClipsWithDelta({
+            clipMoves,
+            deltaFrame,
+            targetLayerId: null,
+          }));
+        } else if (selectedClipId && selectedLayerId) {
+          // 単一選択時
+          dispatch(duplicateClip({ layerId: selectedLayerId, clipId: selectedClipId }));
+        }
+        return;
+      }
+
+      // 矢印キー: フレーム移動
+      // 左矢印: 1フレーム戻る（Shift: 5フレーム）
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const step = e.shiftKey ? 5 : 1;
+        dispatch(setCurrentFrame(Math.max(0, currentFrame - step)));
+        return;
+      }
+
+      // 右矢印: 1フレーム進む（Shift: 5フレーム）
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        const step = e.shiftKey ? 5 : 1;
+        dispatch(setCurrentFrame(Math.min(totalFrames - 1, currentFrame + step)));
+        return;
+      }
+
+      // 上矢印: 直前のクリップの切れ目にジャンプ
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        // 全クリップの境界フレームを収集
+        const boundaries = new Set([0]);
+        Object.values(layers).forEach(layer => {
+          layer.clips.forEach(clip => {
+            boundaries.add(clip.startFrame);
+            boundaries.add(clip.startFrame + clip.durationFrames);
+          });
+        });
+        // 現在位置より前の境界を探す
+        const sortedBoundaries = [...boundaries].sort((a, b) => b - a);
+        const prevBoundary = sortedBoundaries.find(b => b < currentFrame);
+        if (prevBoundary !== undefined) {
+          dispatch(setCurrentFrame(prevBoundary));
+        }
+        return;
+      }
+
+      // 下矢印: 直後のクリップの切れ目にジャンプ
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        // 全クリップの境界フレームを収集
+        const boundaries = new Set();
+        Object.values(layers).forEach(layer => {
+          layer.clips.forEach(clip => {
+            boundaries.add(clip.startFrame);
+            boundaries.add(clip.startFrame + clip.durationFrames);
+          });
+        });
+        // 現在位置より後の境界を探す
+        const sortedBoundaries = [...boundaries].sort((a, b) => a - b);
+        const nextBoundary = sortedBoundaries.find(b => b > currentFrame);
+        if (nextBoundary !== undefined) {
+          dispatch(setCurrentFrame(nextBoundary));
+        }
+        return;
       }
     };
 
@@ -392,6 +547,8 @@ function App() {
     totalFrames,
     isPlaying,
     loopEnabled,
+    canUndo,
+    canRedo,
     dispatch,
     handleNewProject,
     handleLoadProject,

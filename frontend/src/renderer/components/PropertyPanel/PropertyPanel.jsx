@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { updateClip } from '../../store/timelineSlice';
 import { ChevronDown } from '../Icons';
 import { Input } from '../ui';
+import EffectSection from './EffectSection';
 
 // アコーディオンセクションコンポーネント
 const Section = ({ title, children, defaultOpen = true }) => {
@@ -228,6 +229,16 @@ const PropertyPanel = () => {
               suffix="°"
             />
           </Field>
+        </Section>
+      )}
+
+      {/* エフェクト設定（video/image/random_layer用） */}
+      {(clip.type === 'video' || clip.type === 'image' || clip.type === 'random_layer') && (
+        <Section title="エフェクト" defaultOpen={false}>
+          <EffectSection
+            effects={clip.effects || []}
+            onUpdate={(effects) => handleUpdate({ effects })}
+          />
         </Section>
       )}
 

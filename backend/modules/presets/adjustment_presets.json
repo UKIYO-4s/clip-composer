@@ -1,0 +1,76 @@
+{
+  "presets": {
+    "clear": {
+      "name": "クリア",
+      "brightness": 100,
+      "contrast": 100,
+      "saturation": 100,
+      "temperature": 0,
+      "vignette": 0
+    },
+    "soft": {
+      "name": "ソフト",
+      "brightness": 105,
+      "contrast": 90,
+      "saturation": 95,
+      "temperature": 5,
+      "vignette": 0
+    },
+    "vivid": {
+      "name": "ビビッド",
+      "brightness": 100,
+      "contrast": 115,
+      "saturation": 130,
+      "temperature": 0,
+      "vignette": 0
+    },
+    "film": {
+      "name": "フィルム風",
+      "brightness": 95,
+      "contrast": 110,
+      "saturation": 85,
+      "temperature": 10,
+      "vignette": 20
+    },
+    "vintage": {
+      "name": "ビンテージ",
+      "brightness": 95,
+      "contrast": 105,
+      "saturation": 70,
+      "temperature": 20,
+      "vignette": 35
+    },
+    "cinematic": {
+      "name": "シネマティック",
+      "brightness": 95,
+      "contrast": 115,
+      "saturation": 90,
+      "temperature": -10,
+      "vignette": 25
+    },
+    "night": {
+      "name": "夜景風",
+      "brightness": 85,
+      "contrast": 110,
+      "saturation": 80,
+      "temperature": -20,
+      "vignette": 15
+    },
+    "monochrome": {
+      "name": "モノクロ",
+      "brightness": 100,
+      "contrast": 110,
+      "saturation": 0,
+      "temperature": 0,
+      "vignette": 10
+    },
+    "high_contrast": {
+      "name": "ハイコントラスト",
+      "brightness": 100,
+      "contrast": 140,
+      "saturation": 110,
+      "temperature": 0,
+      "vignette": 0
+    }
+  }
+}

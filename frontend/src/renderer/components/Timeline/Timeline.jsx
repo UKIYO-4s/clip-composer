@@ -246,6 +246,30 @@ function Timeline() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedClipIds, dispatch]);
 
+  // 再生バー自動追従（画面外に出そうになったらスクロール）
+  useEffect(() => {
+    if (!timelineRef.current) return;
+
+    const container = timelineRef.current;
+    const playheadPosition = currentFrame * pixelsPerFrame;
+    const containerWidth = container.clientWidth;
+    const scrollLeft = container.scrollLeft;
+
+    // マージン（端から何px以内で追従開始するか）
+    const margin = 100;
+
+    // 再生バーが右端に近づいた場合
+    if (playheadPosition > scrollLeft + containerWidth - margin) {
+      // 再生バーが画面の1/3位置になるようにスクロール
+      container.scrollLeft = playheadPosition - containerWidth / 3;
+    }
+    // 再生バーが左端より左にある場合
+    else if (playheadPosition < scrollLeft + margin) {
+      // 再生バーが画面の2/3位置になるようにスクロール
+      container.scrollLeft = Math.max(0, playheadPosition - containerWidth * 2 / 3);
+    }
+  }, [currentFrame, pixelsPerFrame]);
+
   // 背景クリックで選択解除
   const handleBackgroundClick = useCallback((e) => {
     // クリップやルーラー上のクリックは無視

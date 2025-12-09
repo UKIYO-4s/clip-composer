@@ -158,6 +158,18 @@ const handleClipOverlap = (clips, newClip) => {
   return result;
 };
 
+// 履歴に保存する状態のスナップショットを作成
+const createSnapshot = (state) => ({
+  layers: JSON.parse(JSON.stringify(state.layers)),
+  layerOrder: [...state.layerOrder],
+});
+
+// スナップショットから状態を復元
+const restoreSnapshot = (state, snapshot) => {
+  state.layers = snapshot.layers;
+  state.layerOrder = snapshot.layerOrder;
+};
+
 const initialState = {
   layers: {
     V2: { id: 'V2', name: 'Video 2', type: 'video', clips: sampleClips.V2 },
@@ -174,6 +186,14 @@ const initialState = {
   isPlaying: false,
   loopEnabled: false,
   playbackRate: 1.0,
+
+  // 履歴管理（Undo/Redo用）
+  history: [],
+  historyIndex: -1,
+  maxHistoryLength: 50,
+
+  // クリップボード（コピー/ペースト用）
+  clipboard: [],
 };
 
 const timelineSlice = createSlice({
@@ -643,6 +663,93 @@ const timelineSlice = createSlice({
     setPlaybackRate: (state, action) => {
       state.playbackRate = action.payload;
     },
+    // 履歴に現在の状態を保存（アクション実行前に呼び出す）
+    saveToHistory: (state) => {
+      const snapshot = createSnapshot(state);
+
+      // 現在位置より後ろの履歴を削除（新しいアクション時）
+      if (state.historyIndex < state.history.length - 1) {
+        state.history = state.history.slice(0, state.historyIndex + 1);
+      }
+
+      // スナップショットを追加
+      state.history.push(snapshot);
+
+      // 最大履歴数を超えた場合、古い履歴を削除
+      if (state.history.length > state.maxHistoryLength) {
+        state.history.shift();
+      } else {
+        state.historyIndex++;
+      }
+    },
+    // Undo
+    undo: (state) => {
+      if (state.historyIndex > 0) {
+        state.historyIndex--;
+        restoreSnapshot(state, state.history[state.historyIndex]);
+        state.selectedClipIds = [];
+      }
+    },
+    // Redo
+    redo: (state) => {
+      if (state.historyIndex < state.history.length - 1) {
+        state.historyIndex++;
+        restoreSnapshot(state, state.history[state.historyIndex]);
+        state.selectedClipIds = [];
+      }
+    },
+    // クリップをコピー
+    copyClips: (state, action) => {
+      const { clipIds } = action.payload;
+      const copiedClips = [];
+
+      Object.values(state.layers).forEach(layer => {
+        layer.clips.forEach(clip => {
+          if (clipIds.includes(clip.id)) {
+            copiedClips.push({
+              ...clip,
+              sourceLayerId: layer.id,
+            });
+          }
+        });
+      });
+
+      state.clipboard = copiedClips;
+    },
+    // クリップをペースト
+    pasteClips: (state, action) => {
+      const { targetFrame } = action.payload;
+      if (state.clipboard.length === 0) return;
+
+      // 最小開始フレームを計算（相対位置を維持）
+      const minStartFrame = Math.min(...state.clipboard.map(c => c.startFrame));
+      const frameOffset = targetFrame - minStartFrame;
+
+      state.clipboard.forEach(clip => {
+        const targetLayerId = clip.sourceLayerId;
+        const layer = state.layers[targetLayerId];
+        if (!layer) return;
+
+        const newClip = {
+          ...clip,
+          id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          startFrame: clip.startFrame + frameOffset,
+        };
+        delete newClip.sourceLayerId;
+
+        layer.clips.push(newClip);
+      });
+    },
+    // 全クリップ選択
+    selectAllClips: (state) => {
+      const allClipIds = [];
+      Object.values(state.layers).forEach(layer => {
+        layer.clips.forEach(clip => {
+          allClipIds.push(clip.id);
+        });
+      });
+      state.selectedClipIds = allClipIds;
+    },
   },
 });
 
@@ -674,6 +781,12 @@ export const {
   setIsPlaying,
   setLoopEnabled,
   setPlaybackRate,
+  saveToHistory,
+  undo,
+  redo,
+  copyClips,
+  pasteClips,
+  selectAllClips,
 } = timelineSlice.actions;
 
 export default timelineSlice.reducer;
@@ -686,6 +799,9 @@ export const selectIsPlaying = (state) => state.timeline.isPlaying;
 export const selectLoopEnabled = (state) => state.timeline.loopEnabled;
 export const selectLayers = (state) => state.timeline.layers;
 export const selectLayerOrder = (state) => state.timeline.layerOrder;
+export const selectCanUndo = (state) => state.timeline.historyIndex > 0;
+export const selectCanRedo = (state) => state.timeline.historyIndex < state.timeline.history.length - 1;
+export const selectClipboardLength = (state) => state.timeline.clipboard.length;
 
 // 現在フレームで表示すべきクリップを取得するセレクター（メモ化版）
 export const selectVisibleClips = createSelector(

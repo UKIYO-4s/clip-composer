@@ -11,6 +11,18 @@ import { FolderSelector } from '../../../FolderSelector';
 
 const generateId = () => `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+// 素材タイプに応じた拡張子リストを取得
+const getExtensionsForMediaType = (type, includeGif) => {
+  const video = ['.mp4', '.mov', '.avi', '.webm', '.mkv', '.m4v'];
+  const image = ['.jpg', '.jpeg', '.png', '.webp', '.bmp'];
+  const gifExt = includeGif ? ['.gif'] : [];
+
+  if (type === 'video_only') return video;
+  if (type === 'image_only') return [...image, ...gifExt];
+  if (type === 'both') return [...video, ...image, ...gifExt];
+  return video;
+};
+
 const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
   const layerOrder = useSelector(selectLayerOrder);
@@ -29,6 +41,10 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   // 選択モード
   const [selectionMode, setSelectionMode] = useState('random');
 
+  // 素材タイプ（新規）
+  const [mediaType, setMediaType] = useState('video_only');
+  const [includeGif, setIncludeGif] = useState(false);
+
   // 配置設定
   const [targetLayer, setTargetLayer] = useState('V1');
   const [startPosition, setStartPosition] = useState('current');
@@ -36,16 +52,22 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const [placementMode, setPlacementMode] = useState('continuous');
   const [gapFrames, setGapFrames] = useState(0);
 
+  // 素材タイプに応じた拡張子リスト
+  const currentExtensions = useMemo(
+    () => getExtensionsForMediaType(mediaType, includeGif),
+    [mediaType, includeGif]
+  );
+
   // フォルダ選択フック
   const {
     folderPath,
-    files: videoFiles,
-    totalCount: videoFileCount,
+    files: mediaFiles,
+    totalCount: mediaFileCount,
     isLoading: isLoadingFiles,
     error: fileError,
     selectFolder: handleSelectFolder,
   } = useFolderSelection({
-    extensions: ['.mp4', '.mov', '.avi', '.webm', '.mkv'],
+    extensions: currentExtensions,
   });
 
   // クリップ計算フック使用
@@ -104,6 +126,15 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     };
   }, [calculateStartFrame, calculated, placementMode, gapFrames, fps]);
 
+  // バリデーション: 画像の最小フレーム数チェック
+  const MIN_IMAGE_FRAMES = 6; // 0.2秒 @ 30fps
+  const validationWarning = useMemo(() => {
+    if (mediaType !== 'video_only' && calculated.clipDurationFrames < MIN_IMAGE_FRAMES) {
+      return `画像の場合、最低${MIN_IMAGE_FRAMES}フレーム（約${(MIN_IMAGE_FRAMES / fps).toFixed(2)}秒）を推奨します`;
+    }
+    return null;
+  }, [mediaType, calculated.clipDurationFrames, fps]);
+
   // 一括配置実行
   const handleBulkPlace = useCallback(() => {
     if (!folderPath || !calculated.clipCount) {
@@ -113,17 +144,24 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     let currentFramePos = calculateStartFrame();
     const gap = placementMode === 'continuous' ? 0 : gapFrames;
 
+    // クリップ名を素材タイプに応じて変更
+    const clipNamePrefix = mediaType === 'video_only' ? 'ランダムビデオ' :
+                          mediaType === 'image_only' ? 'ランダム画像' : 'ランダムメディア';
+
     for (let i = 0; i < calculated.clipCount; i++) {
       const clipData = {
         id: generateId(),
         type: 'random_layer',
-        name: `ランダムビデオ ${i + 1}`,
+        name: `${clipNamePrefix} ${i + 1}`,
         startFrame: currentFramePos,
         durationFrames: calculated.clipDurationFrames,
         opacity: 100,
         folderPath: folderPath,
         selectionMode: selectionMode,
-        extensions: '.mp4,.mov,.avi',
+        // 素材タイプ関連（新規）
+        mediaType: mediaType,
+        includeGif: includeGif,
+        extensions: currentExtensions.join(','),
         fileLimit: 0,
         randomSeed: Math.random(),
       };
@@ -134,7 +172,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     }
 
     onClose();
-  }, [dispatch, calculateStartFrame, calculated, placementMode, gapFrames, targetLayer, folderPath, selectionMode, onClose]);
+  }, [dispatch, calculateStartFrame, calculated, placementMode, gapFrames, targetLayer, folderPath, selectionMode, mediaType, includeGif, currentExtensions, onClose]);
 
   if (!isOpen) return null;
 
@@ -143,7 +181,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
       <div className="bg-surface-raised border border-line rounded-lg shadow-lg w-[520px] max-h-[85vh] overflow-y-auto">
         {/* ヘッダー */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-line">
-          <h2 className="text-lg font-semibold text-ink-primary">ランダムビデオ一括配置</h2>
+          <h2 className="text-lg font-semibold text-ink-primary">ランダムメディア一括配置</h2>
           <IconButton
             icon={X}
             onClick={onClose}
@@ -155,16 +193,53 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
 
         {/* コンテンツ */}
         <div className="p-4 space-y-4">
+          {/* 素材タイプ */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-ink-secondary">素材タイプ</label>
+            <div className="flex gap-3">
+              {[
+                { value: 'video_only', label: '動画のみ' },
+                { value: 'image_only', label: '画像のみ' },
+                { value: 'both', label: '両方' },
+              ].map((opt) => (
+                <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="mediaType"
+                    value={opt.value}
+                    checked={mediaType === opt.value}
+                    onChange={(e) => setMediaType(e.target.value)}
+                    className="accent-accent-blue"
+                  />
+                  <span className="text-sm text-ink-primary">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
+            {/* GIF含めるチェック（画像選択時のみ） */}
+            {(mediaType === 'image_only' || mediaType === 'both') && (
+              <label className="flex items-center gap-2 cursor-pointer ml-4">
+                <input
+                  type="checkbox"
+                  checked={includeGif}
+                  onChange={(e) => setIncludeGif(e.target.checked)}
+                  className="accent-accent-blue"
+                />
+                <span className="text-xs text-ink-muted">GIFを含める（重い場合あり）</span>
+              </label>
+            )}
+          </div>
+
           {/* 素材フォルダ（新コンポーネント使用） */}
           <FolderSelector
             folderPath={folderPath}
             onSelect={handleSelectFolder}
             isLoading={isLoadingFiles}
             error={fileError}
-            files={videoFiles}
-            totalCount={videoFileCount}
+            files={mediaFiles}
+            totalCount={mediaFileCount}
             label="素材フォルダ"
-            placeholder="/path/to/videos"
+            placeholder="/path/to/media"
             previewLimit={10}
           />
 
@@ -274,11 +349,18 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
           <div className="p-3 bg-surface-sunken rounded border border-line">
             <h3 className="text-sm font-medium text-ink-secondary mb-2">配置プレビュー</h3>
             <div className="text-xs text-ink-muted space-y-1">
+              <div>素材タイプ: {mediaType === 'video_only' ? '動画のみ' : mediaType === 'image_only' ? '画像のみ' : '両方'}</div>
               <div>総クリップ数: {calculated.clipCount}</div>
               <div>各クリップ: {calculated.clipDurationFrames}フレーム ({calculated.clipDurationSeconds.toFixed(2)}秒)</div>
               <div>配置範囲: {previewInfo.startFrame}〜{previewInfo.endFrame}フレーム</div>
               <div>総時間: {previewInfo.totalSeconds}秒</div>
             </div>
+            {/* バリデーション警告 */}
+            {validationWarning && (
+              <div className="mt-2 text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">
+                {validationWarning}
+              </div>
+            )}
           </div>
         </div>
 

@@ -49,6 +49,22 @@ except ImportError:
     ADJUSTMENT_LAYER_AVAILABLE = False
     print("Warning: AdjustmentLayerHandler not available.")
 
+# トランジションモジュールのインポート
+try:
+    from .effects.transition import get_handler as get_transition_handler
+    TRANSITION_AVAILABLE = True
+except ImportError:
+    TRANSITION_AVAILABLE = False
+    print("Warning: TransitionHandler not available.")
+
+# クリップエフェクトモジュールのインポート
+try:
+    from .effects.clip_effects import apply_effects as apply_clip_effects
+    CLIP_EFFECTS_AVAILABLE = True
+except ImportError:
+    CLIP_EFFECTS_AVAILABLE = False
+    print("Warning: ClipEffects not available.")
+
 
 class VideoProcessor:
     """動画処理を行うメインクラス"""
@@ -351,23 +367,53 @@ class VideoProcessor:
                     clip = self._apply_text_animation(clip, animation, fps)
 
             elif clip_type == 'random_layer':
-                # ランダムレイヤー: フォルダから動画をランダム選択
+                # ランダムレイヤー: フォルダからメディアをランダム選択
                 if RANDOM_LAYER_AVAILABLE:
+                    from .random_layer import is_video_file, is_image_file, is_gif_file
+
                     handler = get_random_handler()
-                    selected_file = handler.select_video(clip_data)
+                    selected_file = handler.select_media(clip_data)
 
                     if selected_file and os.path.exists(selected_file):
-                        video_clip = VideoFileClip(selected_file)
+                        if is_gif_file(selected_file):
+                            # GIFファイルの場合: アニメーションGIFを試行し、失敗したら静止画にフォールバック
+                            try:
+                                # アニメーションGIFはVideoFileClipで読み込み
+                                video_clip = VideoFileClip(selected_file)
 
-                        # 動画の長さがクリップより短い場合はループ
-                        if video_clip.duration < duration:
-                            # ループ回数を計算
-                            num_loops = int(math.ceil(duration / video_clip.duration))
-                            clips_to_concat = [video_clip] * num_loops
-                            video_clip = concatenate_videoclips(clips_to_concat)
+                                # 動画の長さがクリップより短い場合はループ
+                                if video_clip.duration < duration:
+                                    num_loops = int(math.ceil(duration / video_clip.duration))
+                                    clips_to_concat = [video_clip] * num_loops
+                                    video_clip = concatenate_videoclips(clips_to_concat)
 
-                        clip = video_clip.subclip(0, min(duration, video_clip.duration))
-                        clip = clip.set_duration(duration)
+                                clip = video_clip.subclip(0, min(duration, video_clip.duration))
+                                clip = clip.set_duration(duration)
+
+                            except Exception as e:
+                                # 静止GIFまたは読み込み失敗の場合はImageClipにフォールバック
+                                print(f"GIFをVideoClipとして読み込めませんでした。ImageClipとして処理します: {e}")
+                                clip = ImageClip(selected_file, duration=duration)
+
+                        elif is_video_file(selected_file):
+                            # 動画ファイルの場合
+                            video_clip = VideoFileClip(selected_file)
+
+                            # 動画の長さがクリップより短い場合はループ
+                            if video_clip.duration < duration:
+                                num_loops = int(math.ceil(duration / video_clip.duration))
+                                clips_to_concat = [video_clip] * num_loops
+                                video_clip = concatenate_videoclips(clips_to_concat)
+
+                            clip = video_clip.subclip(0, min(duration, video_clip.duration))
+                            clip = clip.set_duration(duration)
+
+                        elif is_image_file(selected_file):
+                            # 画像ファイルの場合
+                            clip = ImageClip(selected_file, duration=duration)
+
+                        else:
+                            print(f"警告: 未対応のファイル形式: {selected_file}")
                     else:
                         print(f"警告: ランダムレイヤーのファイルが見つかりません: {selected_file}")
                 else:
@@ -411,6 +457,14 @@ class VideoProcessor:
                     # 下のレイヤーに対して行う必要がある（別途実装）
                 else:
                     print("警告: AdjustmentLayerHandlerが利用できません")
+
+            # トランジションの適用（オプション）
+            if clip and TRANSITION_AVAILABLE:
+                clip = self._apply_transitions(clip, clip_data, fps)
+
+            # エフェクトの適用（オプション）
+            if clip and CLIP_EFFECTS_AVAILABLE:
+                clip = self._apply_effects(clip, clip_data, fps)
 
             # プロパティの適用
             if clip:
@@ -543,6 +597,91 @@ class VideoProcessor:
         clip = clip.set_start(start_time)
 
         return clip
+
+    def _apply_transitions(self, clip, clip_data: Dict[str, Any], fps: float):
+        """
+        クリップにトランジションを適用
+
+        Args:
+            clip: MoviePy clip object
+            clip_data: クリップデータ（transition_in/transition_out を含む場合あり）
+            fps: フレームレート
+
+        Returns:
+            Modified clip object
+        """
+        if clip is None:
+            return None
+
+        try:
+            handler = get_transition_handler()
+
+            # transition_in の適用
+            transition_in = clip_data.get('transition_in')
+            if transition_in and isinstance(transition_in, dict):
+                transition_type = transition_in.get('type')
+                duration_frames = transition_in.get('duration_frames', 15)
+                easing = transition_in.get('easing', 'linear')
+
+                if transition_type:
+                    clip = handler.apply_transition(
+                        clip,
+                        transition_type,
+                        duration_frames,
+                        fps,
+                        position='in',
+                        easing=easing
+                    )
+
+            # transition_out の適用
+            transition_out = clip_data.get('transition_out')
+            if transition_out and isinstance(transition_out, dict):
+                transition_type = transition_out.get('type')
+                duration_frames = transition_out.get('duration_frames', 15)
+                easing = transition_out.get('easing', 'linear')
+
+                if transition_type:
+                    clip = handler.apply_transition(
+                        clip,
+                        transition_type,
+                        duration_frames,
+                        fps,
+                        position='out',
+                        easing=easing
+                    )
+
+            return clip
+
+        except Exception as e:
+            print(f"トランジション適用エラー: {e}")
+            return clip
+
+    def _apply_effects(self, clip, clip_data: Dict[str, Any], fps: float):
+        """
+        クリップにエフェクトを適用
+
+        Args:
+            clip: MoviePy clip object
+            clip_data: クリップデータ（effects リストを含む場合あり）
+            fps: フレームレート
+
+        Returns:
+            Modified clip object
+        """
+        if clip is None:
+            return None
+
+        effects = clip_data.get('effects')
+        if not effects or not isinstance(effects, list):
+            return clip
+
+        try:
+            clip = apply_clip_effects(clip, effects, fps)
+            return clip
+
+        except Exception as e:
+            print(f"エフェクト適用エラー: {e}")
+            return clip
 
     def _create_text_image(
         self,
