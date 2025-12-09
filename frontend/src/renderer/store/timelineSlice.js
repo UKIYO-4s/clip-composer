@@ -207,6 +207,11 @@ const timelineSlice = createSlice({
       const { layerId, clip, skipOverlapCheck } = action.payload;
       const layer = state.layers[layerId];
 
+      if (!layer) {
+        console.error(`addClip: Layer ${layerId} not found`);
+        return;
+      }
+
       if (skipOverlapCheck) {
         // 重複チェックをスキップ（一括配置用）
         layer.clips.push(clip);

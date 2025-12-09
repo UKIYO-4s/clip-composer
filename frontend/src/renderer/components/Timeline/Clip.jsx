@@ -86,6 +86,9 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
       audio: 'bg-track-audio',
       se: 'bg-track-se',
       adjustment: 'bg-track-adjust',
+      random_layer: 'bg-track-video',
+      variable_text: 'bg-track-text',
+      csv_text_placeholder: 'bg-track-text',
     };
     return colorMap[type] || 'bg-surface-raised';
   };

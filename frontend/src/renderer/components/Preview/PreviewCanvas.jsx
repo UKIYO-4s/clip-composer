@@ -41,8 +41,27 @@ function PreviewCanvas() {
       bgm: '#A855F7', // purple-500
       se: '#06B6D4', // cyan-500
       adjustment: '#EC4899', // pink-500
+      random_layer: '#3B82F6', // blue-500
+      variable_text: '#EAB308', // yellow-500
+      csv_text_placeholder: '#EAB308', // yellow-500
     };
     return colorMap[type] || '#6B7280';
+  };
+
+  // 可変テキストのテンプレートを展開
+  const renderVariableText = (clip) => {
+    if (clip.type === 'variable_text') {
+      let text = clip.template || '';
+      const values = clip.variableValues || {};
+      Object.entries(values).forEach(([key, value]) => {
+        text = text.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value || `[${key}]`);
+      });
+      return text || clip.name;
+    }
+    if (clip.type === 'csv_text_placeholder') {
+      return `[${clip.csvColumnName || 'CSV'}]`;
+    }
+    return clip.textContent || clip.name;
   };
 
   // キャンバス描画
@@ -83,14 +102,26 @@ function PreviewCanvas() {
 
     // 各クリップを描画
     visibleClips.forEach((clip) => {
-      if (clip.type === 'text') {
-        // テキストクリップの描画
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 48px sans-serif';
+      if (clip.type === 'text' || clip.type === 'variable_text' || clip.type === 'csv_text_placeholder') {
+        // テキスト系クリップの描画
+        const text = renderVariableText(clip);
+        const fontSize = clip.fontSize || 48;
+        const textColor = clip.textColor || '#FFFFFF';
+        const bgColor = clip.bgColor || 'transparent';
+
+        // 背景色
+        if (bgColor && bgColor !== 'transparent') {
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        // テキスト描画
+        ctx.fillStyle = textColor;
+        ctx.font = `bold ${Math.min(fontSize, 120)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(clip.name, width / 2, height / 2);
-      } else if (clip.type === 'video' || clip.type === 'image') {
+        ctx.fillText(text, width / 2, height / 2);
+      } else if (clip.type === 'video' || clip.type === 'image' || clip.type === 'random_layer') {
         // 動画/画像クリップのプレースホルダー描画
         const color = getClipColor(clip.type);
 
