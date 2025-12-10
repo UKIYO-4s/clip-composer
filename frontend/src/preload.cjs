@@ -30,9 +30,9 @@ contextBridge.exposeInMainWorld('api', {
     }),
 
     // CSV一括レンダリング開始
-    renderBatch: (timelineData, csvPath, outputDir, options = {}) => ipcRenderer.invoke('python-invoke', {
+    renderBatch: (timelineData, csvPath, outputDir, options = {}, parallel = false, maxWorkers = null) => ipcRenderer.invoke('python-invoke', {
       command: 'render_batch',
-      params: { timelineData, csvPath, outputDir, options }
+      params: { timelineData, csvPath, outputDir, options, parallel, maxWorkers }
     }),
 
     // レンダリングキャンセル
@@ -115,5 +115,33 @@ contextBridge.exposeInMainWorld('api', {
   fs: {
     // テキストファイル書き込み（CSVなど）
     writeTextFile: (path, content) => ipcRenderer.invoke('write-text-file', { path, content }),
+  },
+
+  // ライセンス認証
+  license: {
+    // ライセンス状態取得
+    getStatus: () => ipcRenderer.invoke('license-get-status'),
+
+    // ライセンスキー認証
+    activate: (key) => ipcRenderer.invoke('license-activate', key),
+
+    // トークン検証（再認証）
+    verify: () => ipcRenderer.invoke('license-verify'),
+
+    // デバイス解除
+    deactivate: () => ipcRenderer.invoke('license-deactivate'),
+
+    // オフライン猶予残り時間
+    getGracePeriodRemaining: () => ipcRenderer.invoke('license-grace-remaining'),
+
+    // メインウィンドウを起動（認証成功後）
+    openMainWindow: () => ipcRenderer.invoke('license-open-main-window'),
+
+    // 猶予期間警告リスナー
+    onGraceWarning: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on('license-grace-warning', handler);
+      return () => ipcRenderer.removeListener('license-grace-warning', handler);
+    },
   },
 });

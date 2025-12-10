@@ -43,8 +43,11 @@ function Timeline() {
 
   const timelineRef = useRef(null);
   const rulerRef = useRef(null);
+  const timecodeInputRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
+  const [showTimecodeDialog, setShowTimecodeDialog] = useState(false);
+  const [timecodeInput, setTimecodeInput] = useState('');
 
   // レイヤー表示順序をソート
   // Video: 番号が大きいほど上（V3, V2, V1）
@@ -162,6 +165,76 @@ function Timeline() {
       .toString()
       .padStart(2, '0')}`;
   };
+
+  // タイムコードをフレームに変換
+  const timecodeToFrame = useCallback((timecode) => {
+    // 様々なフォーマットに対応: HH:MM:SS:FF, MM:SS:FF, SS:FF, FF, または秒数
+    const trimmed = timecode.trim();
+
+    // 秒数のみ入力（例: "5.5" -> 5.5秒）
+    if (/^\d+(\.\d+)?$/.test(trimmed)) {
+      const seconds = parseFloat(trimmed);
+      return Math.round(seconds * fps);
+    }
+
+    // コロン区切りのタイムコード
+    const parts = trimmed.split(':').map(p => parseInt(p, 10) || 0);
+
+    let hours = 0, minutes = 0, seconds = 0, frames = 0;
+
+    if (parts.length === 4) {
+      // HH:MM:SS:FF
+      [hours, minutes, seconds, frames] = parts;
+    } else if (parts.length === 3) {
+      // MM:SS:FF
+      [minutes, seconds, frames] = parts;
+    } else if (parts.length === 2) {
+      // 常に SS:FF として解釈（MM:SS が必要なら MM:SS:00 を使用）
+      [seconds, frames] = parts;
+    } else if (parts.length === 1) {
+      // フレーム番号のみ
+      frames = parts[0];
+    }
+
+    const totalFrames = ((hours * 3600 + minutes * 60 + seconds) * fps) + frames;
+    return totalFrames;
+  }, [fps]);
+
+  // タイムコードダイアログを開く
+  const handleOpenTimecodeDialog = useCallback(() => {
+    setTimecodeInput(frameToTimecode(currentFrame));
+    setShowTimecodeDialog(true);
+  }, [currentFrame]);
+
+  // タイムコードダイアログを閉じる
+  const handleCloseTimecodeDialog = useCallback(() => {
+    setShowTimecodeDialog(false);
+  }, []);
+
+  // タイムコードにジャンプ
+  const handleTimecodeJump = useCallback(() => {
+    const targetFrame = timecodeToFrame(timecodeInput);
+    const clampedFrame = Math.max(0, Math.min(targetFrame, totalFrames));
+    dispatch(setCurrentFrame(clampedFrame));
+    setShowTimecodeDialog(false);
+  }, [timecodeInput, timecodeToFrame, totalFrames, dispatch]);
+
+  // タイムコード入力のキーハンドラー
+  const handleTimecodeKeyDown = useCallback((e) => {
+    if (e.key === 'Enter') {
+      handleTimecodeJump();
+    } else if (e.key === 'Escape') {
+      handleCloseTimecodeDialog();
+    }
+  }, [handleTimecodeJump, handleCloseTimecodeDialog]);
+
+  // ダイアログ表示時に入力欄にフォーカス
+  useEffect(() => {
+    if (showTimecodeDialog && timecodeInputRef.current) {
+      timecodeInputRef.current.focus();
+      timecodeInputRef.current.select();
+    }
+  }, [showTimecodeDialog]);
 
   // 再生位置更新（ルーラー専用）
   const updatePlayheadPosition = useCallback((e) => {
@@ -322,13 +395,57 @@ function Timeline() {
       {/* ヘッダー: タイムコード表示 */}
       <div className="flex items-center h-8 bg-surface-raised border-b border-line px-4">
         <div className="w-20 text-sm text-ink-secondary">時間:</div>
-        <div className="font-mono text-sm text-ink-primary">
+        <button
+          onClick={handleOpenTimecodeDialog}
+          className="font-mono text-sm text-ink-primary hover:text-accent-blue hover:bg-state-hover px-2 py-0.5 rounded transition-colors cursor-pointer"
+          title="クリックしてタイムコードを入力"
+        >
           {frameToTimecode(currentFrame)}
-        </div>
+        </button>
         <div className="ml-4 text-xs text-ink-secondary">
           フレーム: {currentFrame} / {totalFrames}
         </div>
       </div>
+
+      {/* タイムコードジャンプダイアログ */}
+      {showTimecodeDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleCloseTimecodeDialog}>
+          <div className="bg-surface-highest rounded-lg shadow-xl p-4 min-w-80" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-medium text-ink-primary mb-3">タイムコードにジャンプ</h3>
+            <div className="mb-4">
+              <input
+                ref={timecodeInputRef}
+                type="text"
+                value={timecodeInput}
+                onChange={(e) => setTimecodeInput(e.target.value)}
+                onKeyDown={handleTimecodeKeyDown}
+                className="w-full px-3 py-2 bg-surface-sunken border border-line rounded text-ink-primary font-mono text-center text-lg focus:outline-none focus:ring-2 focus:ring-accent-blue"
+                placeholder="00:00:00:00"
+              />
+              <p className="text-xs text-ink-muted mt-2">
+                形式: HH:MM:SS:FF / MM:SS:FF / SS:FF / 秒数 / フレーム番号
+              </p>
+              <p className="text-xs text-ink-muted mt-1">
+                ※ 2要素入力は SS:FF（秒:フレーム）として解釈されます
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={handleCloseTimecodeDialog}
+                className="px-3 py-1.5 text-sm text-ink-secondary hover:bg-state-hover rounded transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleTimecodeJump}
+                className="px-3 py-1.5 text-sm bg-accent-blue text-white rounded hover:bg-accent-blue/90 transition-colors"
+              >
+                ジャンプ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* タイムライン本体 */}
       <div className="flex flex-1 overflow-hidden">

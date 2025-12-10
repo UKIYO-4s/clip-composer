@@ -2,15 +2,27 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
+const { getLicenseManager } = require('./license/LicenseManager.cjs');
 
 // UUID v4生成（crypto.randomUUID()を使用）
 const uuidv4 = () => crypto.randomUUID();
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+// ライセンスマネージャーインスタンス
+const licenseManager = getLicenseManager();
+
 let mainWindow = null;
+let licenseWindow = null;
 let pythonProcess = null;
 let pendingRequests = new Map();
+
+// ライセンス状態
+let licenseStatus = {
+  valid: false,
+  gracePeriod: false,
+  remainingHours: 0,
+};
 
 // Python プロセス管理
 class PythonBridge {
@@ -26,20 +38,46 @@ class PythonBridge {
       return;
     }
 
-    const pythonPath = isDev
-      ? path.join(__dirname, '../../backend/venv/bin/python')
-      : path.join(process.resourcesPath, 'backend/venv/bin/python');
+    // Python パスを解決
+    const fs = require('fs');
+    let pythonPath;
+    let scriptPath;
 
-    const scriptPath = isDev
-      ? path.join(__dirname, '../../backend/main.py')
-      : path.join(process.resourcesPath, 'backend/main.py');
+    if (isDev) {
+      // 開発環境: venv を使用
+      pythonPath = path.join(__dirname, '../../backend/venv/bin/python');
+      scriptPath = path.join(__dirname, '../../backend/main.py');
+    } else {
+      // 本番環境: extraResources にコピーされた backend を使用
+      scriptPath = path.join(process.resourcesPath, 'backend/main.py');
+
+      // venv があれば使用、なければシステム Python にフォールバック
+      const bundledPython = path.join(process.resourcesPath, 'backend/venv/bin/python');
+      if (fs.existsSync(bundledPython)) {
+        pythonPath = bundledPython;
+      } else {
+        // システムの python3 を使用
+        pythonPath = 'python3';
+        console.log('Using system Python3 (bundled venv not found)');
+      }
+    }
 
     console.log('Starting Python process:', pythonPath, scriptPath);
+
+    // 作業ディレクトリ
+    const backendDir = isDev
+      ? path.join(__dirname, '../../backend')
+      : path.join(process.resourcesPath, 'backend');
 
     try {
       this.process = spawn(pythonPath, [scriptPath, '--ipc'], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: isDev ? path.join(__dirname, '../../backend') : path.join(process.resourcesPath, 'backend'),
+        cwd: backendDir,
+        env: {
+          ...process.env,
+          // PYTHONPATH を設定してモジュールを見つけやすくする
+          PYTHONPATH: backendDir,
+        },
       });
 
       this.process.stdout.on('data', (data) => {
@@ -219,12 +257,109 @@ function createWindow() {
   }
 }
 
+/**
+ * ライセンス入力ウィンドウを作成
+ */
+function createLicenseWindow() {
+  licenseWindow = new BrowserWindow({
+    width: 500,
+    height: 400,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    title: 'Clip Composer - ライセンス認証',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+    backgroundColor: '#1e1e1e',
+  });
+
+  if (isDev) {
+    // 開発環境: ライセンス画面用のルートを使用
+    licenseWindow.loadURL('http://localhost:5173/#/license');
+  } else {
+    licenseWindow.loadFile(path.join(__dirname, '../build/index.html'), {
+      hash: '/license',
+    });
+  }
+
+  licenseWindow.on('closed', () => {
+    licenseWindow = null;
+    // ライセンス画面を閉じたらアプリ終了
+    if (!mainWindow) {
+      app.quit();
+    }
+  });
+}
+
+/**
+ * 猶予期間警告を表示
+ */
+function showGracePeriodWarning(remainingHours) {
+  if (mainWindow) {
+    mainWindow.webContents.send('license-grace-warning', {
+      remainingHours,
+      message: `オフライン猶予期間: 残り約${remainingHours}時間`,
+    });
+  }
+}
+
+/**
+ * 起動時ライセンスチェック
+ */
+async function checkLicenseOnStartup() {
+  try {
+    await licenseManager.initialize();
+    const result = await licenseManager.verifyToken();
+
+    licenseStatus = {
+      valid: result.valid,
+      gracePeriod: result.gracePeriod || false,
+      remainingHours: result.remainingHours || 0,
+    };
+
+    if (result.valid) {
+      // ライセンス有効: メインウィンドウを起動
+      createWindow();
+
+      // 猶予期間中なら警告表示
+      if (result.gracePeriod) {
+        setTimeout(() => {
+          showGracePeriodWarning(result.remainingHours);
+        }, 2000);
+      }
+    } else {
+      // ライセンス無効: ライセンス入力画面を表示
+      console.log('License invalid:', result.reason);
+      createLicenseWindow();
+    }
+  } catch (error) {
+    console.error('License check failed:', error);
+    // エラー時もライセンス入力画面を表示
+    createLicenseWindow();
+  }
+}
+
 app.whenReady().then(() => {
-  createWindow();
+  // 開発環境ではライセンスチェックをスキップ可能
+  const skipLicenseCheck = isDev && process.env.SKIP_LICENSE_CHECK === 'true';
+
+  if (skipLicenseCheck) {
+    console.log('Skipping license check (development mode)');
+    createWindow();
+  } else {
+    checkLicenseOnStartup();
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+      if (licenseStatus.valid) {
+        createWindow();
+      } else {
+        createLicenseWindow();
+      }
     }
   });
 });
@@ -405,6 +540,37 @@ ipcMain.handle('load-project', async (event, { path }) => {
     return { success: true, data };
   } catch (error) {
     console.error('Failed to load project:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// CSVファイル読み込み
+ipcMain.handle('load-csv', async (event, csvPath) => {
+  const fs = require('fs').promises;
+  try {
+    const content = await fs.readFile(csvPath, 'utf8');
+    const lines = content.split('\n').filter(line => line.trim());
+    if (lines.length === 0) {
+      return { success: false, error: 'CSVファイルが空です' };
+    }
+
+    // ヘッダー行を解析
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+
+    // データ行を解析
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+      const row = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index] || '';
+      });
+      rows.push(row);
+    }
+
+    return { success: true, data: { headers, rows, totalRows: rows.length } };
+  } catch (error) {
+    console.error('Failed to load CSV:', error);
     return { success: false, error: error.message };
   }
 });
@@ -620,5 +786,109 @@ ipcMain.handle('delete-template', async (event, { name }) => {
   } catch (error) {
     console.error('Failed to delete template:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// ==============================
+// ライセンス認証機能
+// ==============================
+
+// ライセンス状態取得
+ipcMain.handle('license-get-status', async () => {
+  try {
+    await licenseManager.initialize();
+    return { success: true, data: licenseManager.getStatus() };
+  } catch (error) {
+    console.error('Failed to get license status:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ライセンスキー認証
+ipcMain.handle('license-activate', async (event, key) => {
+  try {
+    const result = await licenseManager.activate(key);
+    return result;
+  } catch (error) {
+    console.error('Failed to activate license:', error);
+    return { success: false, error: 'UNKNOWN', message: error.message };
+  }
+});
+
+// トークン検証
+ipcMain.handle('license-verify', async () => {
+  try {
+    const result = await licenseManager.verifyToken();
+    return result;
+  } catch (error) {
+    console.error('Failed to verify license:', error);
+    return { valid: false, reason: 'ERROR', message: error.message };
+  }
+});
+
+// デバイス解除
+ipcMain.handle('license-deactivate', async () => {
+  try {
+    const result = await licenseManager.deactivate();
+    return result;
+  } catch (error) {
+    console.error('Failed to deactivate license:', error);
+    return { success: false, error: 'UNKNOWN', message: error.message };
+  }
+});
+
+// オフライン猶予残り時間取得
+ipcMain.handle('license-grace-remaining', async () => {
+  try {
+    await licenseManager.initialize();
+    return { success: true, remainingHours: licenseManager.getGracePeriodRemaining() };
+  } catch (error) {
+    console.error('Failed to get grace period:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ライセンス認証成功後、メインウィンドウを起動
+// セキュリティ強化: DevToolsからの直接呼び出しを防ぐため、必ず検証を実行
+ipcMain.handle('license-open-main-window', async () => {
+  try {
+    // 必ずライセンス検証を実行（バイパス防止）
+    const verifyResult = await licenseManager.verifyToken();
+
+    if (!verifyResult.valid) {
+      console.warn('License verification failed in open-main-window:', verifyResult.reason);
+      return {
+        success: false,
+        error: 'LICENSE_INVALID',
+        reason: verifyResult.reason,
+        message: verifyResult.message || 'ライセンス検証に失敗しました',
+      };
+    }
+
+    // 検証成功: ライセンス状態を更新
+    licenseStatus.valid = true;
+    licenseStatus.gracePeriod = verifyResult.gracePeriod || false;
+    licenseStatus.remainingHours = verifyResult.remainingHours || 0;
+
+    // ライセンスウィンドウを閉じる
+    if (licenseWindow) {
+      licenseWindow.close();
+      licenseWindow = null;
+    }
+
+    // メインウィンドウを起動
+    createWindow();
+
+    // 猶予期間中なら警告表示
+    if (verifyResult.gracePeriod) {
+      setTimeout(() => {
+        showGracePeriodWarning(verifyResult.remainingHours);
+      }, 2000);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to open main window:', error);
+    return { success: false, error: 'UNKNOWN', message: error.message };
   }
 });

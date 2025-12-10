@@ -198,7 +198,7 @@ def apply_blur(
     fps: float
 ) -> VideoClip:
     """
-    ブラーエフェクト
+    ブラーエフェクト（PILを使用したフレーム単位処理）
 
     Args:
         clip: 対象クリップ
@@ -210,13 +210,17 @@ def apply_blur(
         エフェクト適用後のクリップ
 
     Note:
-        **現在未実装**: MoviePyではリアルタイムのブラーエフェクトが困難なため、
-        本エフェクトは暫定的に無効化されています。
-        将来的にはFFmpegフィルタを使用した実装を予定しています。
-
-        暫定措置として、フェードイン/アウトで視覚効果を代用できます。
+        PILのGaussianBlurを使用してフレーム単位でブラーを適用します。
+        処理負荷が高いため、大きなブラー値は推奨しません。
     """
     if not MOVIEPY_AVAILABLE or clip is None:
+        return clip
+
+    try:
+        from PIL import Image, ImageFilter
+        import numpy as np
+    except ImportError:
+        warnings.warn("PIL not available for blur effect")
         return clip
 
     amount = params.get('amount', 5)
@@ -227,14 +231,64 @@ def apply_blur(
     if amount <= 0:
         return clip
 
-    # 警告: ブラーエフェクトは現在未実装
-    warnings.warn(
-        "Blur effect is currently not implemented due to MoviePy limitations. "
-        "The clip will be returned without blur effect. "
-        f"Requested blur amount: {amount}"
-    )
+    position = timing.get('position', 'full')
+    duration_frames = timing.get('duration_frames', 0)
+    easing_name = params.get('easing', 'linear')
 
-    return clip
+    clip_duration = getattr(clip, 'duration', 0)
+    easing_func = get_easing(easing_name)
+
+    if duration_frames <= 0:
+        duration_sec = clip_duration
+    else:
+        duration_sec = duration_frames / fps
+
+    def apply_frame_blur(get_frame):
+        """フレームごとのブラー処理"""
+        def make_frame(t):
+            frame = get_frame(t)
+
+            # 進行度の計算
+            if position == 'full' or duration_frames <= 0:
+                progress = 1.0  # 全体に一定
+                blur_amount = amount
+            elif position == 'in':
+                if t < duration_sec:
+                    progress = easing_func(t / duration_sec)
+                    # インの場合: ブラーから通常へ
+                    blur_amount = amount * (1.0 - progress)
+                else:
+                    blur_amount = 0
+            elif position == 'out':
+                fade_start = max(0.0, clip_duration - duration_sec)
+                if t >= fade_start:
+                    progress = easing_func((t - fade_start) / duration_sec)
+                    # アウトの場合: 通常からブラーへ
+                    blur_amount = amount * progress
+                else:
+                    blur_amount = 0
+            else:
+                blur_amount = amount
+
+            if blur_amount <= 0:
+                return frame
+
+            # NumPy配列からPIL Imageに変換
+            img = Image.fromarray(frame.astype('uint8'))
+
+            # Gaussian Blur適用
+            img = img.filter(ImageFilter.GaussianBlur(radius=blur_amount))
+
+            # NumPy配列に戻す
+            return np.array(img)
+
+        return make_frame
+
+    try:
+        return clip.fl(lambda gf, t: apply_frame_blur(gf)(t))
+    except Exception as e:
+        warnings.warn(f"Blur effect failed: {e}")
+        return clip
 
 
 def apply_rotate(

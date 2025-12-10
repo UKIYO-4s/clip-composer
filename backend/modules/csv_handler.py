@@ -148,7 +148,9 @@ class CSVHandler:
         output_dir: str,
         options: Optional[Dict[str, Any]] = None,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
-        row_callback: Optional[Callable[[int, Dict[str, Any], bool, Optional[str]], None]] = None
+        row_callback: Optional[Callable[[int, Dict[str, Any], bool, Optional[str]], None]] = None,
+        parallel: bool = False,
+        max_workers: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         CSV全行を一括処理して動画を生成
@@ -159,10 +161,22 @@ class CSVHandler:
             options: レンダリングオプション
             progress_callback: 全体進捗コールバック(current, total, message)
             row_callback: 行単位コールバック(row_number, row_data, success, error_message)
+            parallel: 並列処理を使用するかどうか
+            max_workers: 並列処理時の最大ワーカー数
 
         Returns:
             dict: 処理結果 {'success_count': int, 'error_count': int, 'errors': list}
         """
+        # 並列処理の場合
+        if parallel:
+            return self._process_batch_parallel(
+                timeline_data=timeline_data,
+                output_dir=output_dir,
+                options=options,
+                progress_callback=progress_callback,
+                row_callback=row_callback,
+                max_workers=max_workers
+            )
         from modules.video_processor import VideoProcessor
 
         if not self.csv_data:
@@ -401,3 +415,46 @@ class CSVHandler:
             list: エラー情報のリスト
         """
         return self.errors
+
+    def _process_batch_parallel(
+        self,
+        timeline_data: Dict[str, Any],
+        output_dir: str,
+        options: Optional[Dict[str, Any]] = None,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        row_callback: Optional[Callable[[int, Dict[str, Any], bool, Optional[str]], None]] = None,
+        max_workers: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        CSV全行を並列処理して動画を生成
+
+        Args:
+            timeline_data: ベースとなるタイムラインデータ
+            output_dir: 出力先ディレクトリ
+            options: レンダリングオプション
+            progress_callback: 全体進捗コールバック(current, total, message)
+            row_callback: 行単位コールバック(row_number, row_data, success, error_message)
+            max_workers: 最大ワーカー数
+
+        Returns:
+            dict: 処理結果
+        """
+        from modules.parallel_processor import ParallelProcessor
+
+        if not self.csv_data:
+            raise ValueError("CSVデータが読み込まれていません")
+
+        # 並列プロセッサーを作成
+        processor = ParallelProcessor(max_workers=max_workers)
+
+        # 並列処理を実行
+        return processor.process_batch_parallel(
+            csv_data=self.csv_data,
+            timeline_data=timeline_data,
+            output_dir=output_dir,
+            options=options,
+            progress_callback=progress_callback,
+            row_callback=row_callback,
+            parse_row_to_overrides=self.parse_row_to_overrides,
+            validate_row=self.validate_row
+        )

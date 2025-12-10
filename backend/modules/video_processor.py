@@ -67,6 +67,14 @@ except ImportError:
     CLIP_EFFECTS_AVAILABLE = False
     print("Warning: ClipEffects not available.")
 
+# FFmpegフィルターモジュールのインポート
+try:
+    from .effects.ffmpeg_filters import FFmpegFilterApplier, build_filter_chain
+    FFMPEG_FILTERS_AVAILABLE = True
+except ImportError:
+    FFMPEG_FILTERS_AVAILABLE = False
+    print("Warning: FFmpegFilters not available.")
+
 
 class VideoProcessor:
     """動画処理を行うメインクラス"""
@@ -190,9 +198,15 @@ class VideoProcessor:
             if isinstance(resolution, list):
                 resolution = tuple(resolution)
 
+            # FFmpegフィルター適用器の初期化（FPSと総時間を渡す）
+            ffmpeg_filter_applier = None
+            if FFMPEG_FILTERS_AVAILABLE:
+                ffmpeg_filter_applier = FFmpegFilterApplier(fps=fps, total_duration=duration)
+
             # レイヤー別にクリップを準備
             video_clips = []
             audio_clips = []
+            adjustment_layers_data = []  # 調整レイヤーのデータを収集
 
             # ビデオレイヤーの処理（V2, V1など、逆順で処理して重ね順を正しくする）
             video_layer_names = [name for name in layer_order if name.startswith('V')]
@@ -203,6 +217,20 @@ class VideoProcessor:
                 for clip_data in clips:
                     if self._cancel_flag:
                         raise Exception("レンダリングがキャンセルされました")
+
+                    # 調整レイヤーの場合はFFmpegフィルター用にデータを収集
+                    if clip_data.get('type') == 'adjustment':
+                        start_frame = clip_data.get('startFrame', 0)
+                        duration_frames = clip_data.get('durationFrames', total_frames)
+                        end_frame = clip_data.get('endFrame', start_frame + duration_frames)
+                        adjustment_layers_data.append({
+                            'data': clip_data,
+                            'start_frame': start_frame,
+                            'end_frame': end_frame
+                        })
+                        if ffmpeg_filter_applier:
+                            ffmpeg_filter_applier.add_adjustment_layer(clip_data, start_frame, end_frame)
+                        continue  # 調整レイヤーはMoviePyクリップとしては追加しない
 
                     clip = self._create_video_clip(clip_data, fps, resolution)
                     if clip:
@@ -267,17 +295,29 @@ class VideoProcessor:
                         'status': 'rendering'
                     })
 
+            # FFmpegフィルターパラメータの取得
+            ffmpeg_params = []
+            if ffmpeg_filter_applier and adjustment_layers_data:
+                ffmpeg_params = ffmpeg_filter_applier.get_ffmpeg_params()
+                if ffmpeg_params:
+                    print(f"  FFmpegフィルター適用: {ffmpeg_params}")
+
             # 動画の書き出し
-            final_video.write_videofile(
-                output_path,
-                codec=render_options['codec'],
-                audio_codec=render_options['audio_codec'],
-                preset=render_options['preset'],
-                fps=fps,
-                threads=render_options['threads'],
-                bitrate=render_options['bitrate'],
-                logger=None,  # 標準のログ出力を抑制
-            )
+            write_options = {
+                'codec': render_options['codec'],
+                'audio_codec': render_options['audio_codec'],
+                'preset': render_options['preset'],
+                'fps': fps,
+                'threads': render_options['threads'],
+                'bitrate': render_options['bitrate'],
+                'logger': None,  # 標準のログ出力を抑制
+            }
+
+            # FFmpegフィルターがある場合は追加
+            if ffmpeg_params:
+                write_options['ffmpeg_params'] = ffmpeg_params
+
+            final_video.write_videofile(output_path, **write_options)
 
             # レンダリング完了
             with self._progress_lock:

@@ -199,6 +199,10 @@ def handle_render_batch(params: dict, handler: IPCHandler):
     output_dir = params.get("outputDir")
     options = params.get("options", {})
 
+    # 並列処理オプション
+    parallel = params.get("parallel", False)
+    max_workers = params.get("maxWorkers")  # None の場合は自動設定
+
     if not csv_path:
         raise ValueError("csvPath is required")
     if not timeline_data:
@@ -220,7 +224,8 @@ def handle_render_batch(params: dict, handler: IPCHandler):
         percentage = (current / total * 100) if total > 0 else 0
         handler.send_progress(percentage, message, {
             'current': current,
-            'total': total
+            'total': total,
+            'parallel': parallel
         })
 
     # 行単位コールバック（各動画の成功/失敗を通知）
@@ -247,7 +252,9 @@ def handle_render_batch(params: dict, handler: IPCHandler):
         output_dir=output_dir,
         options=options,
         progress_callback=progress_callback,
-        row_callback=row_callback
+        row_callback=row_callback,
+        parallel=parallel,
+        max_workers=max_workers
     )
 
     return result
