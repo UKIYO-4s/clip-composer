@@ -10,6 +10,7 @@ export default {
     'frontend/build/**/*',
     'frontend/src/main.cjs',
     'frontend/src/preload.cjs',
+    'frontend/src/license/**/*',
     'backend/**/*',
     '!backend/venv/**/*',
     '!backend/__pycache__/**/*',
@@ -41,7 +42,7 @@ export default {
     target: [
       {
         target: 'dmg',
-        arch: ['arm64'], // 現在のMac用（Apple Silicon）
+        arch: ['x64', 'arm64'], // Intel Mac + Apple Silicon両対応
       },
     ],
   },
