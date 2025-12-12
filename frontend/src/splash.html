@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clip Composer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      overflow: hidden;
+      -webkit-app-region: drag;
+    }
+
+    .logo-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      width: 120px;
+      height: 120px;
+      background: linear-gradient(135deg, #a855f7 0%, #3b82f6 100%);
+      border-radius: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+      font-weight: bold;
+      color: #fff;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 40px rgba(168, 85, 247, 0.3);
+    }
+
+    .app-name {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+
+    .version {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+      margin-top: 8px;
+    }
+
+    .progress-container {
+      width: 280px;
+      margin-top: 20px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #a855f7, #3b82f6);
+      border-radius: 2px;
+      width: 0%;
+      animation: loading 2s ease-in-out infinite;
+    }
+
+    @keyframes loading {
+      0% {
+        width: 0%;
+        margin-left: 0%;
+      }
+      50% {
+        width: 60%;
+        margin-left: 20%;
+      }
+      100% {
+        width: 0%;
+        margin-left: 100%;
+      }
+    }
+
+    .status {
+      margin-top: 16px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo-container">
+    <div class="logo">C</div>
+    <div class="app-name">Clip Composer</div>
+    <div class="version">Version 1.0.0</div>
+  </div>
+
+  <div class="progress-container">
+    <div class="progress-bar">
+      <div class="progress-fill"></div>
+    </div>
+    <div class="status" id="status">起動中...</div>
+  </div>
+
+  <script>
+    const statusMessages = [
+      '起動中...',
+      'システムを初期化しています...',
+      'バックエンドを準備しています...',
+      'アプリケーションを読み込んでいます...'
+    ];
+
+    let currentIndex = 0;
+    const statusEl = document.getElementById('status');
+
+    setInterval(() => {
+      currentIndex = (currentIndex + 1) % statusMessages.length;
+      statusEl.textContent = statusMessages[currentIndex];
+    }, 800);
+  </script>
+</body>
+</html>

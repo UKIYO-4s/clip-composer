@@ -14,6 +14,7 @@ const licenseManager = getLicenseManager();
 
 let mainWindow = null;
 let licenseWindow = null;
+let splashWindow = null;
 let pythonProcess = null;
 let pendingRequests = new Map();
 
@@ -239,6 +240,45 @@ class PythonBridge {
 
 const pythonBridge = new PythonBridge();
 
+/**
+ * スプラッシュウィンドウを作成
+ */
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 400,
+    height: 300,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    center: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  splashWindow.loadFile(path.join(__dirname, 'splash.html'));
+
+  splashWindow.on('closed', () => {
+    splashWindow = null;
+  });
+}
+
+/**
+ * スプラッシュを閉じてメインウィンドウを表示
+ */
+function closeSplashAndShowMain() {
+  if (splashWindow) {
+    splashWindow.close();
+    splashWindow = null;
+  }
+  if (mainWindow) {
+    mainWindow.show();
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -246,6 +286,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 768,
     title: 'Clip Composer',
+    show: false, // 最初は非表示
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -257,8 +298,19 @@ function createWindow() {
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
+    // 開発環境ではすぐに表示
+    mainWindow.once('ready-to-show', () => {
+      closeSplashAndShowMain();
+    });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../build/index.html'));
+    // 本番環境: ページの読み込み完了後に表示
+    mainWindow.once('ready-to-show', () => {
+      // 少し遅延させてスムーズに見せる
+      setTimeout(() => {
+        closeSplashAndShowMain();
+      }, 500);
+    });
   }
 
   mainWindow.on('closed', () => {
@@ -361,6 +413,11 @@ async function checkLicenseOnStartup() {
 }
 
 app.whenReady().then(() => {
+  // スプラッシュ画面を表示（本番環境のみ）
+  if (!isDev) {
+    createSplashWindow();
+  }
+
   // テスト配布用: ライセンスチェックをスキップ
   // TODO: 販売時にはこのフラグをfalseに変更すること
   const SKIP_LICENSE_FOR_TESTING = true;

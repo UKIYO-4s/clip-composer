@@ -10,6 +10,7 @@ export default {
     'frontend/build/**/*',
     'frontend/src/main.cjs',
     'frontend/src/preload.cjs',
+    'frontend/src/splash.html',
     'frontend/src/license/**/*',
     'backend/**/*',
     '!backend/venv/**/*',
