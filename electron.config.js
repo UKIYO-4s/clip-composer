@@ -18,21 +18,22 @@ export default {
     'assets/**/*',
   ],
   extraResources: [
+    // PyInstallerでビルドされたPythonバックエンド
     {
-      from: 'backend',
+      from: 'backend/dist/clip_composer_backend',
       to: 'backend',
-      filter: [
-        '**/*.py',
-        '!venv/**/*',
-        '!**/__pycache__/**/*',
-        '!**/*.pyc',
-      ],
+      filter: ['**/*'],
+    },
+    // FFmpegバイナリ
+    {
+      from: 'assets/bin',
+      to: 'bin',
+      filter: ['ffmpeg', 'ffprobe'],
     },
   ],
   mac: {
     category: 'public.app-category.video',
-    // アイコンファイルが存在する場合のみ使用
-    // icon: 'assets/icon.icns',
+    icon: 'assets/icon.icns',
     hardenedRuntime: true,
     gatekeeperAssess: false,
     entitlements: 'assets/entitlements.mac.plist',
@@ -72,7 +73,7 @@ export default {
         arch: ['x64'],
       },
     ],
-    // icon: 'assets/icon.ico',
+    icon: 'assets/icon.ico',
   },
   nsis: {
     oneClick: false,
@@ -89,7 +90,7 @@ export default {
       },
     ],
     category: 'Video',
-    // icon: 'assets/icon.png',
+    icon: 'assets/icon.png',
   },
   // afterPack: async (context) => {
   //   // Python環境のセットアップをここで行うことができる

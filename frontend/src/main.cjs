@@ -40,43 +40,61 @@ class PythonBridge {
 
     // Python パスを解決
     const fs = require('fs');
-    let pythonPath;
-    let scriptPath;
+    let executablePath;
+    let executableArgs;
+    let backendDir;
 
     if (isDev) {
       // 開発環境: venv を使用
-      pythonPath = path.join(__dirname, '../../backend/venv/bin/python');
-      scriptPath = path.join(__dirname, '../../backend/main.py');
+      const pythonPath = path.join(__dirname, '../../backend/venv/bin/python');
+      const scriptPath = path.join(__dirname, '../../backend/main.py');
+      executablePath = pythonPath;
+      executableArgs = [scriptPath, '--ipc'];
+      backendDir = path.join(__dirname, '../../backend');
     } else {
-      // 本番環境: extraResources にコピーされた backend を使用
-      scriptPath = path.join(process.resourcesPath, 'backend/main.py');
+      // 本番環境: PyInstallerでビルドされた実行ファイルを使用
+      const bundledBackend = path.join(process.resourcesPath, 'backend/clip_composer_backend');
 
-      // venv があれば使用、なければシステム Python にフォールバック
-      const bundledPython = path.join(process.resourcesPath, 'backend/venv/bin/python');
-      if (fs.existsSync(bundledPython)) {
-        pythonPath = bundledPython;
+      if (fs.existsSync(bundledBackend)) {
+        executablePath = bundledBackend;
+        executableArgs = ['--ipc'];
+        backendDir = path.join(process.resourcesPath, 'backend');
+        console.log('Using bundled PyInstaller backend');
       } else {
-        // システムの python3 を使用
-        pythonPath = 'python3';
-        console.log('Using system Python3 (bundled venv not found)');
+        // フォールバック: システムPythonを使用
+        console.log('Bundled backend not found, falling back to system Python');
+        const scriptPath = path.join(process.resourcesPath, 'backend/main.py');
+        executablePath = 'python3';
+        executableArgs = [scriptPath, '--ipc'];
+        backendDir = path.join(process.resourcesPath, 'backend');
       }
     }
 
-    console.log('Starting Python process:', pythonPath, scriptPath);
+    // FFmpegパスを設定
+    let ffmpegDir;
+    if (isDev) {
+      // 開発環境: システムのFFmpegを使用
+      ffmpegDir = '/usr/local/bin';
+    } else {
+      // 本番環境: バンドルされたFFmpegを使用
+      ffmpegDir = path.join(process.resourcesPath, 'bin');
+    }
 
-    // 作業ディレクトリ
-    const backendDir = isDev
-      ? path.join(__dirname, '../../backend')
-      : path.join(process.resourcesPath, 'backend');
+    console.log('Starting backend process:', executablePath, executableArgs.join(' '));
+    console.log('FFmpeg directory:', ffmpegDir);
 
     try {
-      this.process = spawn(pythonPath, [scriptPath, '--ipc'], {
+      this.process = spawn(executablePath, executableArgs, {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: backendDir,
         env: {
           ...process.env,
           // PYTHONPATH を設定してモジュールを見つけやすくする
           PYTHONPATH: backendDir,
+          // FFmpegのパスを追加
+          PATH: `${ffmpegDir}:${process.env.PATH}`,
+          // MoviePy用のFFmpegパス
+          IMAGEIO_FFMPEG_EXE: path.join(ffmpegDir, 'ffmpeg'),
         },
       });
 
@@ -343,11 +361,15 @@ async function checkLicenseOnStartup() {
 }
 
 app.whenReady().then(() => {
+  // テスト配布用: ライセンスチェックをスキップ
+  // TODO: 販売時にはこのフラグをfalseに変更すること
+  const SKIP_LICENSE_FOR_TESTING = true;
+
   // 開発環境ではライセンスチェックをスキップ可能
-  const skipLicenseCheck = isDev && process.env.SKIP_LICENSE_CHECK === 'true';
+  const skipLicenseCheck = SKIP_LICENSE_FOR_TESTING || (isDev && process.env.SKIP_LICENSE_CHECK === 'true');
 
   if (skipLicenseCheck) {
-    console.log('Skipping license check (development mode)');
+    console.log('Skipping license check (testing/development mode)');
     createWindow();
   } else {
     checkLicenseOnStartup();
