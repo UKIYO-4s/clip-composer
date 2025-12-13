@@ -8,6 +8,7 @@ import os
 import re
 import threading
 import math
+import tempfile
 from PIL import Image, ImageDraw, ImageFont
 from modules.font_utils import get_font
 import numpy as np
@@ -191,6 +192,9 @@ class VideoProcessor:
             print(f"レンダリング開始: {output_path}")
             print(f"  FPS: {fps}, Duration: {duration}s, Total Frames: {total_frames}")
             print(f"  Layers: {len(layers)}, Order: {layer_order}")
+            print(f"[DEBUG] Timeline data received:")
+            import json
+            print(json.dumps(timeline_data, indent=2, default=str, ensure_ascii=False)[:2000])
 
             # 解像度の取得
             resolution = render_options.get('resolution', (1920, 1080))
@@ -256,13 +260,29 @@ class VideoProcessor:
                 resolution = render_options.get('resolution', (1920, 1080))
                 video_clips.append(ColorClip(size=resolution, color=(0, 0, 0), duration=duration))
 
-            # ビデオクリップの合成
-            if len(video_clips) == 1:
-                final_video = video_clips[0]
-            else:
-                final_video = CompositeVideoClip(video_clips, size=render_options.get('resolution', (1920, 1080)))
+            # ビデオクリップの合成（常にCompositeVideoClipを使用して解像度を適用）
+            resolution = render_options.get('resolution', (1920, 1080))
+            final_video = CompositeVideoClip(video_clips, size=resolution)
 
-            final_video = final_video.set_duration(duration).set_fps(fps)
+            # 実際のクリップの長さを計算（各クリップの終了時間の最大値）
+            actual_duration = 0
+            for clip in video_clips:
+                if clip is not None:
+                    clip_end = clip.start + clip.duration if hasattr(clip, 'start') and clip.start else clip.duration
+                    actual_duration = max(actual_duration, clip_end)
+
+            # タイムラインで指定されたdurationと実際のクリップの長さのうち短い方を使用
+            # ただし、タイムラインのdurationが0より大きい場合のみ
+            if duration > 0 and actual_duration > 0:
+                final_duration = min(duration, actual_duration)
+            elif actual_duration > 0:
+                final_duration = actual_duration
+            else:
+                final_duration = duration
+
+            print(f"  Timeline duration: {duration:.2f}s, Actual clip duration: {actual_duration:.2f}s, Final: {final_duration:.2f}s")
+
+            final_video = final_video.set_duration(final_duration).set_fps(fps)
 
             # オーディオの合成
             if audio_clips:
@@ -274,26 +294,41 @@ class VideoProcessor:
             if output_dir and not os.path.exists(output_dir):
                 os.makedirs(output_dir)
 
-            # 進捗コールバックラッパー
-            def write_progress_callback(t):
-                """MoviePyの進捗コールバック"""
-                if self._cancel_flag:
-                    raise Exception("レンダリングがキャンセルされました")
+            # 進捗コールバック用のカスタムロガー
+            from proglog import ProgressBarLogger
 
-                current_frame = int(t * fps)
-                percentage = (current_frame / total_frames * 100) if total_frames > 0 else 0
+            class RenderProgressLogger(ProgressBarLogger):
+                def __init__(self, processor, progress_cb, total_dur, fps_val):
+                    super().__init__()
+                    self.processor = processor
+                    self.progress_cb = progress_cb
+                    self.total_duration = total_dur
+                    self.fps_val = fps_val
+                    self.last_percentage = -1
 
-                with self._progress_lock:
-                    self._progress['current_frame'] = current_frame
-                    self._progress['percentage'] = percentage
+                def bars_callback(self, bar, attr, value, old_value=None):
+                    if bar == 'chunk' and attr == 't':
+                        # value is current time in seconds
+                        percentage = min(100, (value / self.total_duration * 100)) if self.total_duration > 0 else 0
+                        current_frame = int(value * self.fps_val)
 
-                if progress_callback:
-                    progress_callback({
-                        'current_frame': current_frame,
-                        'total_frames': total_frames,
-                        'percentage': percentage,
-                        'status': 'rendering'
-                    })
+                        # 1%刻みで送信（頻度を抑える）
+                        if int(percentage) > self.last_percentage:
+                            self.last_percentage = int(percentage)
+
+                            with self.processor._progress_lock:
+                                self.processor._progress['current_frame'] = current_frame
+                                self.processor._progress['percentage'] = percentage
+
+                            if self.progress_cb:
+                                self.progress_cb({
+                                    'current_frame': current_frame,
+                                    'total_frames': int(self.total_duration * self.fps_val),
+                                    'percentage': percentage,
+                                    'status': 'rendering'
+                                })
+
+            render_logger = RenderProgressLogger(self, progress_callback, final_duration, fps)
 
             # FFmpegフィルターパラメータの取得
             ffmpeg_params = []
@@ -310,12 +345,18 @@ class VideoProcessor:
                 'fps': fps,
                 'threads': render_options['threads'],
                 'bitrate': render_options['bitrate'],
-                'logger': None,  # 標準のログ出力を抑制
+                'logger': render_logger,  # カスタムロガーで進捗を送信
             }
 
             # FFmpegフィルターがある場合は追加
             if ffmpeg_params:
                 write_options['ffmpeg_params'] = ffmpeg_params
+
+            # 一時オーディオファイルを絶対パスで指定（相対パスでの失敗を防ぐ）
+            tmp_fd, tmp_audio_path = tempfile.mkstemp(suffix=".m4a", prefix="cc_tmp_audio_")
+            os.close(tmp_fd)
+            write_options['temp_audiofile'] = tmp_audio_path
+            write_options['remove_temp'] = True
 
             final_video.write_videofile(output_path, **write_options)
 
@@ -387,6 +428,8 @@ class VideoProcessor:
             duration = (end_frame - start_frame) / fps if end_frame > start_frame else duration_frames / fps
             start_time = start_frame / fps
 
+            print(f"[DEBUG] _create_video_clip: type={clip_type}, startFrame={start_frame}, durationFrames={duration_frames}, endFrame={end_frame}, duration={duration:.2f}s, start_time={start_time:.2f}s")
+
             clip = None
 
             # クリップタイプ別の処理
@@ -399,8 +442,12 @@ class VideoProcessor:
                     in_point = clip_data.get('inPoint', 0) / fps
                     out_point = clip_data.get('outPoint', video_clip.duration * fps) / fps
 
-                    clip = video_clip.subclip(in_point, min(out_point, video_clip.duration))
-                    clip = clip.set_duration(duration)
+                    # subclipで切り出し（set_durationは使わない - 映像が壊れる原因になる）
+                    actual_out = min(out_point, video_clip.duration)
+                    clip = video_clip.subclip(in_point, actual_out)
+                    # subclipの長さをそのまま使用（durationは参考値として記録のみ）
+                    print(f"  Video clip: {file_path}")
+                    print(f"    in_point={in_point:.2f}s, out_point={actual_out:.2f}s, duration={clip.duration:.2f}s")
 
             elif clip_type == 'image':
                 file_path = clip_data.get('filePath')
@@ -565,7 +612,7 @@ class VideoProcessor:
 
             # プロパティの適用
             if clip:
-                clip = self._apply_clip_properties(clip, clip_data, start_time)
+                clip = self._apply_clip_properties(clip, clip_data, start_time, resolution)
 
             return clip
 
@@ -658,7 +705,47 @@ class VideoProcessor:
             print(f"オーディオクリップ作成エラー: {e}")
             return None
 
-    def _apply_clip_properties(self, clip, clip_data: Dict[str, Any], start_time: float):
+    def _apply_fit_mode(self, clip, fit_mode: str, resolution: tuple):
+        """
+        クリップにfitモードを適用
+
+        Args:
+            clip: MoviePy clip object
+            fit_mode: 'contain' (default), 'cover', or 'none'
+            resolution: 出力解像度 (width, height)
+
+        Returns:
+            Modified clip object, fit_scale (フィット時のスケール倍率)
+        """
+        if not hasattr(clip, 'size') or clip.size is None:
+            return clip, 1.0
+
+        clip_w, clip_h = clip.size
+        canvas_w, canvas_h = resolution
+
+        if fit_mode == 'none':
+            # 元サイズのまま
+            return clip, 1.0
+
+        elif fit_mode == 'cover':
+            # キャンバスを完全に覆うようにリサイズ（はみ出し許容）
+            scale_w = canvas_w / clip_w
+            scale_h = canvas_h / clip_h
+            fit_scale = max(scale_w, scale_h)
+            if fit_scale != 1.0:
+                clip = clip.resize(fit_scale)
+            return clip, fit_scale
+
+        else:  # 'contain' (default)
+            # キャンバスに収まるようにリサイズ（余白=黒）
+            scale_w = canvas_w / clip_w
+            scale_h = canvas_h / clip_h
+            fit_scale = min(scale_w, scale_h)
+            if fit_scale != 1.0:
+                clip = clip.resize(fit_scale)
+            return clip, fit_scale
+
+    def _apply_clip_properties(self, clip, clip_data: Dict[str, Any], start_time: float, resolution: tuple = (1920, 1080)):
         """
         クリップにプロパティを適用
 
@@ -666,17 +753,25 @@ class VideoProcessor:
             clip: MoviePy clip object
             clip_data: クリップデータ
             start_time: 開始時間
+            resolution: 出力解像度（中心基準計算用）
 
         Returns:
             Modified clip object
         """
-        # 位置
-        position_x = clip_data.get('positionX', 0)
-        position_y = clip_data.get('positionY', 0)
-        clip = clip.set_position((position_x, position_y))
+        clip_type = clip_data.get('type', '')
 
-        # スケール
-        scale = clip_data.get('scale', 1.0)
+        # fitモードの適用（video/image/random_layer のみ）
+        # fitモードはscale適用前に行う（ベースサイズを決定）
+        fit_mode = clip_data.get('fit', 'contain')  # デフォルト: contain
+        if clip_type in ['video', 'image', 'random_layer']:
+            clip, fit_scale = self._apply_fit_mode(clip, fit_mode, resolution)
+        else:
+            fit_scale = 1.0
+
+        # スケール（フロントエンドから0-400%で送られるため100で割る）
+        # fitモード適用後のサイズに対する追加スケール
+        scale_raw = clip_data.get('scale', 100)
+        scale = max(0.01, scale_raw / 100.0)  # 100% -> 1.0
         if scale != 1.0:
             clip = clip.resize(scale)
 
@@ -685,10 +780,30 @@ class VideoProcessor:
         if rotation != 0:
             clip = clip.rotate(rotation)
 
-        # 不透明度
-        opacity = clip_data.get('opacity', 1.0)
+        # 不透明度（フロントエンドから0-100%で送られるため100で割る）
+        opacity_raw = clip_data.get('opacity', 100)
+        opacity = max(0.0, min(1.0, opacity_raw / 100.0))  # 100% -> 1.0
         if opacity != 1.0:
             clip = clip.set_opacity(opacity)
+
+        # 位置（中心基準から左上基準に変換）
+        # フロントエンドは中心基準、MoviePyは左上基準
+        position_x = clip_data.get('positionX', 0)
+        position_y = clip_data.get('positionY', 0)
+
+        # クリップサイズを取得（fit + scale + 回転後）
+        clip_w, clip_h = clip.size if hasattr(clip, 'size') and clip.size else (resolution[0], resolution[1])
+
+        # 中心基準から左上基準に変換
+        # center_x = left_x + clip_w / 2 => left_x = center_x - clip_w / 2
+        # 画面中心を(0,0)としてのオフセット
+        canvas_center_x = resolution[0] / 2
+        canvas_center_y = resolution[1] / 2
+
+        left_x = canvas_center_x + position_x - clip_w / 2
+        left_y = canvas_center_y + position_y - clip_h / 2
+
+        clip = clip.set_position((left_x, left_y))
 
         # 開始時間
         clip = clip.set_start(start_time)

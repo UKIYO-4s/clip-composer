@@ -10,6 +10,7 @@ function PreviewCanvas() {
   const canvasRef = useRef(null);
   const { layers, layerOrder, currentFrame, fps, resolution } = useSelector((state) => state.timeline);
   const [mediaReady, setMediaReady] = useState({});
+  const [showOverlay, setShowOverlay] = useState(true); // プレビューオーバーレイ表示フラグ
 
   // キャンバスサイズ
   const canvasWidth = resolution?.width || 1080;
@@ -91,6 +92,7 @@ function PreviewCanvas() {
     const rotation = (clip.rotation || 0) * Math.PI / 180;
     const posX = clip.positionX || 0;
     const posY = clip.positionY || 0;
+    const fitMode = clip.fit || 'contain';
 
     ctx.globalAlpha = opacity;
 
@@ -102,7 +104,7 @@ function PreviewCanvas() {
     ctx.rotate(rotation);
     ctx.scale(scale, scale);
 
-    // メディアのサイズ計算（アスペクト比を保持してフィット）
+    // メディアのサイズ計算
     const mediaWidth = media.videoWidth || media.naturalWidth || media.width;
     const mediaHeight = media.videoHeight || media.naturalHeight || media.height;
 
@@ -112,18 +114,117 @@ function PreviewCanvas() {
 
       let drawWidth, drawHeight;
 
-      if (aspectRatio > canvasAspectRatio) {
-        // 横長のメディア
-        drawWidth = width;
-        drawHeight = width / aspectRatio;
+      if (fitMode === 'none') {
+        // 元のサイズをそのまま使用
+        drawWidth = mediaWidth;
+        drawHeight = mediaHeight;
+      } else if (fitMode === 'cover') {
+        // キャンバス全体をカバー（はみ出し許容）
+        if (aspectRatio > canvasAspectRatio) {
+          drawHeight = height;
+          drawWidth = height * aspectRatio;
+        } else {
+          drawWidth = width;
+          drawHeight = width / aspectRatio;
+        }
       } else {
-        // 縦長のメディア
-        drawHeight = height;
-        drawWidth = height * aspectRatio;
+        // contain（デフォルト）: キャンバス内に収まるようにフィット
+        if (aspectRatio > canvasAspectRatio) {
+          drawWidth = width;
+          drawHeight = width / aspectRatio;
+        } else {
+          drawHeight = height;
+          drawWidth = height * aspectRatio;
+        }
       }
 
       ctx.drawImage(media, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
     }
+
+    ctx.restore();
+  };
+
+  // フォールバック色（previewColorがない場合）
+  const DEFAULT_OVERLAY_COLOR = '#888888';
+
+  // previewColorオーバーレイを描画
+  const drawPreviewOverlay = (ctx, clip, width, height) => {
+    ctx.save();
+
+    const scale = (clip.scale || 100) / 100;
+    const posX = clip.positionX || 0;
+    const posY = clip.positionY || 0;
+    // previewColorがなければフォールバック色を使用
+    const overlayColor = clip.previewColor || DEFAULT_OVERLAY_COLOR;
+
+    // オーバーレイのサイズ（33%スケールの場合は1/3のサイズ）
+    const overlayWidth = width * scale;
+    const overlayHeight = height * scale;
+
+    // 中心を基準に位置計算
+    const centerX = width / 2 + posX;
+    const centerY = height / 2 + posY;
+
+    // 半透明の矩形を描画
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = overlayColor;
+    ctx.fillRect(
+      centerX - overlayWidth / 2,
+      centerY - overlayHeight / 2,
+      overlayWidth,
+      overlayHeight
+    );
+
+    // 枠線を描画
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = overlayColor;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(
+      centerX - overlayWidth / 2,
+      centerY - overlayHeight / 2,
+      overlayWidth,
+      overlayHeight
+    );
+
+    // ラベルを描画（1行目: レイヤーID: クリップ名）
+    ctx.globalAlpha = 1;
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    // ラベルテキスト（レイヤーID付き）
+    const labelLine1 = `${clip.layerId}: ${clip.name || 'Clip'}`;
+    // 2行目: 位置・スケール情報
+    const labelLine2 = `pos(${posX}, ${posY}) scale:${Math.round(scale * 100)}%`;
+
+    const labelPadding = 4;
+    const lineHeight = 18;
+    const labelMetrics1 = ctx.measureText(labelLine1);
+    ctx.font = '12px sans-serif';
+    const labelMetrics2 = ctx.measureText(labelLine2);
+    const labelWidth = Math.max(labelMetrics1.width, labelMetrics2.width);
+
+    const labelX = centerX - overlayWidth / 2 + 4;
+    const labelY = centerY - overlayHeight / 2 + 4;
+
+    // ラベル背景（2行分）
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(
+      labelX - labelPadding,
+      labelY - labelPadding,
+      labelWidth + labelPadding * 2,
+      lineHeight * 2 + labelPadding * 2
+    );
+
+    // 1行目（レイヤーID: クリップ名）
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillStyle = overlayColor;
+    ctx.fillText(labelLine1, labelX, labelY);
+
+    // 2行目（位置・スケール情報）
+    ctx.font = '12px sans-serif';
+    ctx.fillStyle = '#AAAAAA';
+    ctx.fillText(labelLine2, labelX, labelY + lineHeight);
 
     ctx.restore();
   };
@@ -191,6 +292,11 @@ function PreviewCanvas() {
           drawAdjustmentPlaceholder(ctx, clip, width, height);
         }
         // オーディオクリップ（bgm, se）は視覚的には表示しない
+
+        // previewColorオーバーレイを描画（showOverlayがONの場合、previewColorがなくてもフォールバック色で表示）
+        if (showOverlay) {
+          drawPreviewOverlay(ctx, clip, width, height);
+        }
       }
 
       // フレーム情報（デバッグ用、左上）
@@ -205,7 +311,7 @@ function PreviewCanvas() {
 
     renderClips();
 
-  }, [layers, layerOrder, currentFrame, fps, mediaReady, getVisibleClips]);
+  }, [layers, layerOrder, currentFrame, fps, mediaReady, getVisibleClips, showOverlay]);
 
   // テキストクリップを描画
   const drawTextClip = (ctx, clip, width, height) => {
@@ -284,12 +390,26 @@ function PreviewCanvas() {
   };
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={canvasWidth}
-      height={canvasHeight}
-      className="w-full h-full object-contain"
-    />
+    <div className="relative w-full h-full">
+      <canvas
+        ref={canvasRef}
+        width={canvasWidth}
+        height={canvasHeight}
+        className="w-full h-full object-contain"
+      />
+      {/* オーバーレイ表示トグルボタン */}
+      <button
+        onClick={() => setShowOverlay(!showOverlay)}
+        className={`absolute top-2 right-2 px-2 py-1 text-xs rounded transition-colors ${
+          showOverlay
+            ? 'bg-primary text-white'
+            : 'bg-surface-raised text-text-secondary hover:bg-surface-hover'
+        }`}
+        title={showOverlay ? 'オーバーレイを非表示' : 'オーバーレイを表示'}
+      >
+        {showOverlay ? '🎨 ON' : '🎨 OFF'}
+      </button>
+    </div>
   );
 }
 

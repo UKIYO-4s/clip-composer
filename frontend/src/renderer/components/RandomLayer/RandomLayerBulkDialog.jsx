@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addClip, selectLayerOrder, selectLayers } from '../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../ui';
@@ -12,6 +12,17 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const layers = useSelector(selectLayers);
   const currentFrame = useSelector((state) => state.timeline.currentFrame);
 
+  // ビデオレイヤーのみ抽出（useEffectより先に定義）
+  const layerOptions = useMemo(() =>
+    layerOrder
+      .filter(id => id.startsWith('V'))
+      .map(layerId => ({
+        value: layerId,
+        label: layers[layerId]?.name || layerId
+      })),
+    [layerOrder, layers]
+  );
+
   // 設定状態
   const [clipCount, setClipCount] = useState(10);
   const [clipDuration, setClipDuration] = useState(60); // フレーム
@@ -23,16 +34,20 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const [folderPath, setFolderPath] = useState('');
   const [selectionMode, setSelectionMode] = useState('random'); // 'random', 'sequential', 'shuffle'
 
-  // ビデオレイヤーのみ抽出
-  const layerOptions = useMemo(() =>
-    layerOrder
-      .filter(id => id.startsWith('V'))
-      .map(layerId => ({
-        value: layerId,
-        label: layers[layerId]?.name || layerId
-      })),
-    [layerOrder, layers]
-  );
+  // ダイアログを開くたびに初期化して、前回の設定が残らないようにする
+  useEffect(() => {
+    if (isOpen) {
+      setClipCount(10);
+      setClipDuration(60);
+      setTargetLayer(layerOptions[0]?.value || 'V1');
+      setStartPosition('current');
+      setCustomStartFrame(0);
+      setPlacementMode('continuous');
+      setGapFrames(0);
+      setFolderPath('');
+      setSelectionMode('random');
+    }
+  }, [isOpen, layerOptions]);
 
   // 開始位置を計算
   const calculateStartFrame = useCallback(() => {

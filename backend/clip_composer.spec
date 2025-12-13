@@ -2,7 +2,7 @@
 # PyInstaller spec file for Clip Composer Backend
 
 import sys
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, collect_all, copy_metadata
 
 block_cipher = None
 
@@ -14,11 +14,21 @@ hidden_imports = [
     'moviepy.audio',
     'moviepy.video.fx.all',
     'moviepy.audio.fx.all',
+    'moviepy.video.io',
+    'moviepy.video.io.ffmpeg_reader',
+    'moviepy.video.io.ffmpeg_writer',
+    'moviepy.video.VideoClip',
+    'moviepy.audio.AudioClip',
     'cv2',
     'PIL',
     'PIL.Image',
     'pandas',
     'numpy',
+    'imageio',
+    'imageio_ffmpeg',
+    'proglog',
+    'decorator',
+    'tqdm',
     'json',
     'sys',
     'os',
@@ -26,6 +36,19 @@ hidden_imports = [
 
 # MoviePyのサブモジュールを収集
 hidden_imports += collect_submodules('moviepy')
+hidden_imports += collect_submodules('imageio')
+hidden_imports += collect_submodules('imageio_ffmpeg')
+
+# MoviePyのデータファイルを収集（メタデータも含む）
+datas = []
+datas += collect_data_files('moviepy')
+datas += collect_data_files('imageio', include_py_files=True)
+datas += collect_data_files('imageio_ffmpeg', include_py_files=True)
+
+# パッケージのメタデータを追加（PyInstaller標準の方法）
+datas += copy_metadata('imageio')
+datas += copy_metadata('imageio-ffmpeg')
+datas += copy_metadata('moviepy')
 
 a = Analysis(
     ['main.py'],
@@ -34,7 +57,7 @@ a = Analysis(
     datas=[
         ('modules', 'modules'),
         ('utils', 'utils'),
-    ],
+    ] + datas,
     hiddenimports=hidden_imports,
     hookspath=[],
     hooksconfig={},

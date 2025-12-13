@@ -220,13 +220,15 @@ function ExportDialog() {
       quality: settings.quality,
     };
 
+    // 開始時刻をローカル変数で保持（クロージャでキャプチャ）
+    const exportStartTime = Date.now();
     dispatch(startExport({ outputPath }));
-    setStartTime(Date.now());
+    setStartTime(exportStartTime);
 
     try {
       // 進捗リスナーを設定
       const removeProgressListener = window.api.python.onProgress((data) => {
-        const elapsed = (Date.now() - startTime) / 1000;
+        const elapsed = (Date.now() - exportStartTime) / 1000;
         const remaining = data.progress > 0
           ? (elapsed / data.progress) * (100 - data.progress)
           : 0;
@@ -282,8 +284,10 @@ function ExportDialog() {
       quality: settings.quality,
     };
 
+    // 開始時刻をローカル変数で保持（クロージャでキャプチャ）
+    const batchStartTime = Date.now();
     dispatch(startBatchExport({ total: 0 }));
-    setStartTime(Date.now());
+    setStartTime(batchStartTime);
 
     try {
       // 進捗リスナーを設定

@@ -8,6 +8,20 @@ import argparse
 import sys
 from datetime import datetime
 
+# PyInstaller用: モジュールをトップレベルでインポートして依存関係を確実に含める
+# これらのインポートはPyInstallerが依存関係を検出するために必要
+from moviepy.editor import (
+    VideoFileClip,
+    ImageClip,
+    AudioFileClip,
+    CompositeVideoClip,
+    CompositeAudioClip,
+    ColorClip,
+    concatenate_videoclips
+)
+import imageio
+import imageio_ffmpeg
+
 
 def setup_logger():
     """ロガーのセットアップ"""

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setCurrentFrame, addClip, clearSelection, addVideoLayer, addSoundLayer, removeLayer, removeClips } from '../../store/timelineSlice';
+import { setCurrentFrame, addClip, clearSelection, addVideoLayer, addSoundLayer, removeLayer, removeClips, setPixelsPerFrame } from '../../store/timelineSlice';
 import Layer from './Layer';
 import TransportControls from '../Controls/TransportControls';
 import MarqueeSelection from './MarqueeSelection';
@@ -318,6 +318,49 @@ function Timeline() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedClipIds, dispatch]);
+
+  // Option+マウスホイールでズームイン/アウト
+  const handleWheel = useCallback((e) => {
+    // Option（Alt）キー押下中のみズーム処理
+    if (!e.altKey) return;
+
+    e.preventDefault();
+
+    // ホイール方向でズーム（上:拡大、下:縮小）
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    const newPixelsPerFrame = Math.max(0.5, Math.min(20, pixelsPerFrame + delta));
+
+    // ズーム時にマウス位置を保持するため、スクロール位置を調整
+    if (timelineRef.current) {
+      const rect = timelineRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const scrollLeft = timelineRef.current.scrollLeft;
+      const mouseFrame = (mouseX + scrollLeft) / pixelsPerFrame;
+
+      // ズーム後のスクロール位置を計算
+      const newScrollLeft = mouseFrame * newPixelsPerFrame - mouseX;
+
+      dispatch(setPixelsPerFrame(newPixelsPerFrame));
+
+      // スクロール位置を更新（次フレームで実行）
+      requestAnimationFrame(() => {
+        if (timelineRef.current) {
+          timelineRef.current.scrollLeft = newScrollLeft;
+        }
+      });
+    } else {
+      dispatch(setPixelsPerFrame(newPixelsPerFrame));
+    }
+  }, [pixelsPerFrame, dispatch]);
+
+  // タイムラインにホイールイベントを追加
+  useEffect(() => {
+    const timeline = timelineRef.current;
+    if (!timeline) return;
+
+    timeline.addEventListener('wheel', handleWheel, { passive: false });
+    return () => timeline.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
 
   // 再生バー自動追従（画面外に出そうになったらスクロール）
   useEffect(() => {

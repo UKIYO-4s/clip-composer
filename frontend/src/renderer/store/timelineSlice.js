@@ -185,6 +185,8 @@ const initialState = {
   layerOrder: ['V2', 'V1', 'S2', 'S1'],
   currentFrame: 0,
   pixelsPerFrame: 2,
+  minPixelsPerFrame: 0.5,
+  maxPixelsPerFrame: 20,
   selectedClipIds: [],
   isPlaying: false,
   loopEnabled: false,
@@ -387,7 +389,27 @@ const timelineSlice = createSlice({
       state.layerOrder = state.layerOrder.filter(id => id !== layerId);
     },
     setPixelsPerFrame: (state, action) => {
-      state.pixelsPerFrame = action.payload;
+      state.pixelsPerFrame = Math.max(
+        state.minPixelsPerFrame,
+        Math.min(state.maxPixelsPerFrame, action.payload)
+      );
+    },
+    // ズーム設定（クランピング付き）
+    setZoom: (state, action) => {
+      state.pixelsPerFrame = Math.max(
+        state.minPixelsPerFrame,
+        Math.min(state.maxPixelsPerFrame, action.payload)
+      );
+    },
+    // ズームイン（1.25倍）
+    zoomIn: (state) => {
+      const newValue = state.pixelsPerFrame * 1.25;
+      state.pixelsPerFrame = Math.min(state.maxPixelsPerFrame, newValue);
+    },
+    // ズームアウト（0.8倍）
+    zoomOut: (state) => {
+      const newValue = state.pixelsPerFrame * 0.8;
+      state.pixelsPerFrame = Math.max(state.minPixelsPerFrame, newValue);
     },
     resizeClipStart: (state, action) => {
       const { layerId, clipId, newStartFrame } = action.payload;
@@ -843,6 +865,9 @@ export const {
   addSoundLayer,
   removeLayer,
   setPixelsPerFrame,
+  setZoom,
+  zoomIn,
+  zoomOut,
   resizeClipStart,
   resizeClipEnd,
   splitClip,
@@ -880,6 +905,9 @@ export const selectLayerOrder = (state) => state.timeline.layerOrder;
 export const selectCanUndo = (state) => state.timeline.historyIndex > 0;
 export const selectCanRedo = (state) => state.timeline.historyIndex < state.timeline.history.length - 1;
 export const selectClipboardLength = (state) => state.timeline.clipboard.length;
+export const selectPixelsPerFrame = (state) => state.timeline.pixelsPerFrame;
+export const selectMinPixelsPerFrame = (state) => state.timeline.minPixelsPerFrame;
+export const selectMaxPixelsPerFrame = (state) => state.timeline.maxPixelsPerFrame;
 
 // 現在フレームで表示すべきクリップを取得するセレクター（メモ化版）
 export const selectVisibleClips = createSelector(

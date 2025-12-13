@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addClip, selectLayerOrder, selectLayers } from '../../../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../../../ui';
@@ -10,6 +10,18 @@ import { useFolderSelection } from '../../../../hooks';
 import { FolderSelector } from '../../../FolderSelector';
 
 const generateId = () => `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// プレビュー色のパレット
+const PREVIEW_COLORS = [
+  '#22C55E', // green
+  '#3B82F6', // blue
+  '#F59E0B', // amber
+  '#EF4444', // red
+  '#8B5CF6', // violet
+  '#EC4899', // pink
+  '#06B6D4', // cyan
+  '#F97316', // orange
+];
 
 // 素材タイプに応じた拡張子リストを取得
 const getExtensionsForMediaType = (type, includeGif) => {
@@ -29,6 +41,17 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const layers = useSelector(selectLayers);
   const currentFrame = useSelector((state) => state.timeline.currentFrame);
   const fps = useSelector((state) => state.timeline.fps);
+
+  // ビデオレイヤーのみ抽出（useEffectより先に定義）
+  const layerOptions = useMemo(() =>
+    layerOrder
+      .filter(id => id.startsWith('V'))
+      .map(layerId => ({
+        value: layerId,
+        label: layers[layerId]?.name || layerId
+      })),
+    [layerOrder, layers]
+  );
 
   // 入力モード
   const [inputMode, setInputMode] = useState('clipDuration');
@@ -58,7 +81,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     [mediaType, includeGif]
   );
 
-  // フォルダ選択フック
+  // フォルダ選択フック（useEffectより先に定義してTDZを回避）
   const {
     folderPath,
     files: mediaFiles,
@@ -66,9 +89,34 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     isLoading: isLoadingFiles,
     error: fileError,
     selectFolder: handleSelectFolder,
+    reset: resetFolder,
   } = useFolderSelection({
     extensions: currentExtensions,
   });
+
+  // ダイアログを開くたびに初期値へリセット（前回の状態が残らないようにする）
+  useEffect(() => {
+    if (isOpen) {
+      setInputMode('clipDuration');
+      setInputValues({
+        clipCount: 15,
+        clipDuration: 60,
+        totalDuration: 3,
+      });
+      setSelectionMode('random');
+      setMediaType('video_only');
+      setIncludeGif(false);
+      setStartPosition('current');
+      setCustomStartFrame(0);
+      setPlacementMode('continuous');
+      setGapFrames(0);
+      const firstVideoLayer = layerOptions[0]?.value || 'V1';
+      setTargetLayer(firstVideoLayer);
+      // フォルダパスをリセット
+      resetFolder();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // クリップ計算フック使用
   const calculated = useClipCalculation({
@@ -78,17 +126,6 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     totalDuration: inputValues.totalDuration,
     fps,
   });
-
-  // ビデオレイヤーのみ抽出
-  const layerOptions = useMemo(() =>
-    layerOrder
-      .filter(id => id.startsWith('V'))
-      .map(layerId => ({
-        value: layerId,
-        label: layers[layerId]?.name || layerId
-      })),
-    [layerOrder, layers]
-  );
 
   // 開始位置を計算
   const calculateStartFrame = useCallback(() => {
@@ -164,6 +201,8 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
         extensions: currentExtensions.join(','),
         fileLimit: 0,
         randomSeed: Math.random(),
+        // プレビュー色（パレットから順番に割り当て）
+        previewColor: PREVIEW_COLORS[i % PREVIEW_COLORS.length],
       };
 
       dispatch(addClip({ layerId: targetLayer, clip: clipData, skipOverlapCheck: true }));
