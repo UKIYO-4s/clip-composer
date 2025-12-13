@@ -26,11 +26,20 @@ const FieldRow = ({ label, value, onChange, suffix, step = 1 }) => (
     <span className="text-xs text-ink-secondary w-20">{label}:</span>
     <input
       type="number"
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
+      value={value === '' || value === null || value === undefined ? '' : value}
+      onChange={(e) => {
+        const rawValue = e.target.value;
+        // 空文字の場合はそのまま空文字を渡す（0に変換しない）
+        if (rawValue === '') {
+          onChange('');
+        } else {
+          onChange(Number(rawValue));
+        }
+      }}
       step={step}
       min={step}
       className="w-20 h-7 px-2 text-sm bg-surface-base border border-line rounded text-ink-primary"
+      placeholder="0"
     />
     <span className="text-xs text-ink-muted">{suffix}</span>
   </div>

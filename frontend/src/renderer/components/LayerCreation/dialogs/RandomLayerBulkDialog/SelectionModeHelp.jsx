@@ -1,17 +1,13 @@
 import React from 'react';
 
 const SELECTION_MODES = {
-  random: {
+  shuffle: {
     label: 'ランダム',
-    description: '毎回ランダムに選択（A→A→C→B→A）',
+    description: '重複なしで全素材を使用後、再シャッフル（B→A→C→A→B→C）',
   },
   sequential: {
     label: '順番',
-    description: '順番通りに繰り返し（A→B→C→A→B）',
-  },
-  shuffle: {
-    label: 'シャッフル',
-    description: '重複なしで全素材使用後リセット（B→A→C→A→B）',
+    description: '順番通りに繰り返し（A→B→C→A→B→C）',
   },
 };
 

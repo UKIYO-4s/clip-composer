@@ -61,8 +61,8 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     totalDuration: 3, // 秒
   });
 
-  // 選択モード
-  const [selectionMode, setSelectionMode] = useState('random');
+  // 選択モード（shuffleがデフォルト、UIでは「ランダム」と表示）
+  const [selectionMode, setSelectionMode] = useState('shuffle');
 
   // 素材タイプ（新規）
   const [mediaType, setMediaType] = useState('video_only');
@@ -74,6 +74,9 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const [customStartFrame, setCustomStartFrame] = useState(0);
   const [placementMode, setPlacementMode] = useState('continuous');
   const [gapFrames, setGapFrames] = useState(0);
+
+  // エラーメッセージ
+  const [errorMessage, setErrorMessage] = useState('');
 
   // 素材タイプに応じた拡張子リスト
   const currentExtensions = useMemo(
@@ -103,13 +106,14 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
         clipDuration: 60,
         totalDuration: 3,
       });
-      setSelectionMode('random');
+      setSelectionMode('shuffle');
       setMediaType('video_only');
       setIncludeGif(false);
       setStartPosition('current');
       setCustomStartFrame(0);
       setPlacementMode('continuous');
       setGapFrames(0);
+      setErrorMessage('');
       const firstVideoLayer = layerOptions[0]?.value || 'V1';
       setTargetLayer(firstVideoLayer);
       // フォルダパスをリセット
@@ -172,11 +176,51 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     return null;
   }, [mediaType, calculated.clipDurationFrames, fps]);
 
+  // バリデーション関数
+  const validateInputs = useCallback(() => {
+    // フォルダ選択チェック
+    if (!folderPath) {
+      return '素材フォルダを選択してください';
+    }
+
+    // 入力モードに応じた必須フィールドチェック
+    if (inputMode === 'clipDuration') {
+      if (!inputValues.clipCount || inputValues.clipCount === '' || inputValues.clipCount <= 0) {
+        return 'クリップ数を入力してください';
+      }
+      if (!inputValues.clipDuration || inputValues.clipDuration === '' || inputValues.clipDuration <= 0) {
+        return '各クリップのフレーム数を入力してください';
+      }
+    } else if (inputMode === 'divideDuration') {
+      if (!inputValues.totalDuration || inputValues.totalDuration === '' || inputValues.totalDuration <= 0) {
+        return '合計時間を入力してください';
+      }
+      if (!inputValues.clipCount || inputValues.clipCount === '' || inputValues.clipCount <= 0) {
+        return 'クリップ数を入力してください';
+      }
+    } else if (inputMode === 'fillDuration') {
+      if (!inputValues.totalDuration || inputValues.totalDuration === '' || inputValues.totalDuration <= 0) {
+        return '合計時間を入力してください';
+      }
+      if (!inputValues.clipDuration || inputValues.clipDuration === '' || inputValues.clipDuration <= 0) {
+        return '各クリップのフレーム数を入力してください';
+      }
+    }
+
+    return null; // バリデーション成功
+  }, [folderPath, inputMode, inputValues]);
+
   // 一括配置実行
   const handleBulkPlace = useCallback(() => {
-    if (!folderPath || !calculated.clipCount) {
+    // バリデーション
+    const error = validateInputs();
+    if (error) {
+      setErrorMessage(error);
       return;
     }
+
+    // エラーをクリア
+    setErrorMessage('');
 
     let currentFramePos = calculateStartFrame();
     const gap = placementMode === 'continuous' ? 0 : gapFrames;
@@ -211,7 +255,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     }
 
     onClose();
-  }, [dispatch, calculateStartFrame, calculated, placementMode, gapFrames, targetLayer, folderPath, selectionMode, mediaType, includeGif, currentExtensions, onClose]);
+  }, [dispatch, calculateStartFrame, calculated, placementMode, gapFrames, targetLayer, folderPath, selectionMode, mediaType, includeGif, currentExtensions, onClose, validateInputs]);
 
   if (!isOpen) return null;
 
@@ -404,13 +448,21 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
         </div>
 
         {/* フッター */}
-        <div className="flex justify-end gap-3 px-4 py-3 border-t border-line">
-          <Button variant="subtle" onClick={onClose}>
-            キャンセル
-          </Button>
-          <Button variant="primary" onClick={handleBulkPlace}>
-            配置実行
-          </Button>
+        <div className="px-4 py-3 border-t border-line space-y-2">
+          {/* エラーメッセージ */}
+          {errorMessage && (
+            <div className="text-sm text-red-500 font-medium">
+              {errorMessage}
+            </div>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button variant="subtle" onClick={onClose}>
+              キャンセル
+            </Button>
+            <Button variant="primary" onClick={handleBulkPlace}>
+              配置実行
+            </Button>
+          </div>
         </div>
       </div>
     </div>
