@@ -32,7 +32,8 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const [placementMode, setPlacementMode] = useState('continuous'); // 'continuous', 'spaced'
   const [gapFrames, setGapFrames] = useState(0);
   const [folderPath, setFolderPath] = useState('');
-  const [selectionMode, setSelectionMode] = useState('random'); // 'random', 'sequential', 'shuffle'
+  const [selectionMode, setSelectionMode] = useState('shuffle'); // 'shuffle'(ランダム), 'sequential'(順番)
+  const [errorMessage, setErrorMessage] = useState('');
 
   // ダイアログを開くたびに初期化して、前回の設定が残らないようにする
   useEffect(() => {
@@ -45,9 +46,11 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
       setPlacementMode('continuous');
       setGapFrames(0);
       setFolderPath('');
-      setSelectionMode('random');
+      setSelectionMode('shuffle');
+      setErrorMessage('');
     }
-  }, [isOpen, layerOptions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // 開始位置を計算
   const calculateStartFrame = useCallback(() => {
@@ -87,6 +90,23 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
 
   // 一括配置実行
   const handleBulkPlace = useCallback(() => {
+    // バリデーション
+    if (!folderPath || folderPath.trim() === '') {
+      setErrorMessage('素材フォルダを選択してください');
+      return;
+    }
+    if (!clipCount || clipCount === '' || clipCount <= 0) {
+      setErrorMessage('クリップ数を入力してください');
+      return;
+    }
+    if (!clipDuration || clipDuration === '' || clipDuration <= 0) {
+      setErrorMessage('各クリップの長さを入力してください');
+      return;
+    }
+
+    // エラーをクリア
+    setErrorMessage('');
+
     let currentFramePos = calculateStartFrame();
     const gap = placementMode === 'continuous' ? 0 : gapFrames;
 
@@ -150,9 +170,8 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
             value={selectionMode}
             onChange={(e) => setSelectionMode(e.target.value)}
             options={[
-              { value: 'random', label: 'ランダム' },
+              { value: 'shuffle', label: 'ランダム' },
               { value: 'sequential', label: '順番' },
-              { value: 'shuffle', label: 'シャッフル' },
             ]}
           />
 
@@ -162,22 +181,38 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
               <label className="text-xs font-medium text-ink-secondary">クリップ数</label>
               <Input
                 type="number"
-                value={clipCount}
-                onChange={(e) => setClipCount(Math.max(1, parseInt(e.target.value) || 1))}
+                value={clipCount === '' ? '' : clipCount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setClipCount('');
+                  } else {
+                    setClipCount(Math.max(1, parseInt(val) || 1));
+                  }
+                }}
                 min={1}
                 max={100}
+                placeholder="10"
               />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-ink-secondary">各クリップの長さ（フレーム）</label>
               <Input
                 type="number"
-                value={clipDuration}
-                onChange={(e) => setClipDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                value={clipDuration === '' ? '' : clipDuration}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    setClipDuration('');
+                  } else {
+                    setClipDuration(Math.max(1, parseInt(val) || 1));
+                  }
+                }}
                 min={1}
+                placeholder="60"
               />
               <span className="text-xs text-ink-muted">
-                {(clipDuration / 30).toFixed(2)}秒 @ 30fps
+                {clipDuration ? `${(clipDuration / 30).toFixed(2)}秒 @ 30fps` : ''}
               </span>
             </div>
           </div>
@@ -277,13 +312,21 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
         </div>
 
         {/* フッター */}
-        <div className="flex justify-end gap-3 px-4 py-3 border-t border-line">
-          <Button variant="subtle" onClick={onClose}>
-            キャンセル
-          </Button>
-          <Button variant="primary" onClick={handleBulkPlace}>
-            配置実行
-          </Button>
+        <div className="px-4 py-3 border-t border-line space-y-2">
+          {/* エラーメッセージ */}
+          {errorMessage && (
+            <div className="text-sm text-red-500 font-medium">
+              {errorMessage}
+            </div>
+          )}
+          <div className="flex justify-end gap-3">
+            <Button variant="subtle" onClick={onClose}>
+              キャンセル
+            </Button>
+            <Button variant="primary" onClick={handleBulkPlace}>
+              配置実行
+            </Button>
+          </div>
         </div>
       </div>
     </div>
