@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useDrag } from 'react-dnd';
-import { selectClip, toggleClipSelection, resizeClipStart, resizeClipEnd } from '../../store/timelineSlice';
+import { selectClip, toggleClipSelection, resizeClipStart, resizeClipEnd, selectFps } from '../../store/timelineSlice';
 
 // ドラッグ&ドロップ用アイテムタイプ
 export const ItemTypes = {
@@ -16,15 +16,19 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
   const dispatch = useDispatch();
   const selectedClipIds = useSelector((state) => state.timeline.selectedClipIds);
   const layers = useSelector((state) => state.timeline.layers);
+  const fps = useSelector(selectFps);
   const isSelected = selectedClipIds.includes(clip.id);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeType, setResizeType] = useState(null); // 'start' or 'end'
   const resizeDataRef = useRef({});
 
+  // クリップ要素のrefを保持
+  const clipRef = useRef(null);
+
   // useDrag フック
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemTypes.CLIP,
-    item: () => {
+    item: (monitor) => {
       // ドラッグ開始時にクリップを選択（選択されていない場合）
       if (!selectedClipIds.includes(clip.id)) {
         dispatch(selectClip({ clipId: clip.id }));
@@ -46,6 +50,14 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
         }
       }
 
+      // grabOffsetPx を計算: カーソル位置 - クリップ左端
+      let grabOffsetPx = 0;
+      const initialClientOffset = monitor.getInitialClientOffset();
+      if (clipRef.current && initialClientOffset) {
+        const clipRect = clipRef.current.getBoundingClientRect();
+        grabOffsetPx = initialClientOffset.x - clipRect.left;
+      }
+
       return {
         id: clip.id,
         layerId,
@@ -59,6 +71,8 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
         originalLayerId: layerId,
         // 各クリップの詳細情報
         selectedClipsInfo,
+        // グラブオフセット（ドロップ位置補正用）
+        grabOffsetPx,
       };
     },
     collect: (monitor) => ({
@@ -73,8 +87,8 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
   // クリップの位置計算
   const left = clip.startFrame * pixelsPerFrame;
 
-  // クリップの長さ（秒数表示、fps=30固定）
-  const durationSeconds = (clip.durationFrames / 30).toFixed(1);
+  // クリップの長さ（秒数表示、タイムラインfpsを使用）
+  const durationSeconds = (clip.durationFrames / fps).toFixed(1);
 
   // クリップタイプごとの色分け
   const getClipColor = (type) => {
@@ -154,9 +168,15 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
     };
   }, [isResizing, resizeType, clip.id, layerId, pixelsPerFrame, dispatch]);
 
+  // ref を結合（clipRef と drag 両方に設定）
+  const setRefs = (el) => {
+    clipRef.current = el;
+    drag(el);
+  };
+
   return (
     <div
-      ref={drag}
+      ref={setRefs}
       data-clip={clip.id}
       className={`
         absolute top-1 bottom-1 rounded

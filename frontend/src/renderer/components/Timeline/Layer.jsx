@@ -1,30 +1,125 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useDrop } from 'react-dnd';
 import Clip, { ItemTypes } from './Clip';
 import { moveClip, moveClipToLayer, duplicateClipToPosition, moveClipsWithDelta, duplicateClipsWithDelta, saveToHistory } from '../../store/timelineSlice';
 
-function Layer({ layerId, layer, pixelsPerFrame }) {
+function Layer({ layerId, layer, pixelsPerFrame, snapBoundaries, snapThresholdFrames, onSnapGuideShow, onSnapGuideHide }) {
   const dispatch = useDispatch();
   const selectedClipIds = useSelector((state) => state.timeline.selectedClipIds);
   const layerRef = useRef(null);
 
   const isVideoLayer = layer.type === 'video';
 
+  // スナップ計算関数
+  const calculateSnappedFrame = useCallback((candidateFrame, clipDuration = 0, isAltPressed = false) => {
+    // Altキーが押されている場合はスナップを無効化
+    if (isAltPressed || !snapBoundaries || snapBoundaries.length === 0) {
+      return {
+        snappedFrame: candidateFrame,
+        didSnap: false,
+        snapPosition: null,
+      };
+    }
+
+    const candidateEndFrame = candidateFrame + clipDuration;
+    let bestSnapResult = null;
+    let minDistance = Infinity;
+
+    // 開始フレームでのスナップをチェック
+    for (const boundary of snapBoundaries) {
+      const startDistance = Math.abs(candidateFrame - boundary);
+      if (startDistance < minDistance && startDistance <= snapThresholdFrames) {
+        minDistance = startDistance;
+        bestSnapResult = {
+          snappedFrame: boundary,
+          didSnap: true,
+          snapPosition: boundary,
+        };
+      }
+    }
+
+    // 終了フレームでのスナップをチェック（クリップの長さがある場合）
+    if (clipDuration > 0) {
+      for (const boundary of snapBoundaries) {
+        const endDistance = Math.abs(candidateEndFrame - boundary);
+        if (endDistance < minDistance && endDistance <= snapThresholdFrames) {
+          minDistance = endDistance;
+          bestSnapResult = {
+            snappedFrame: boundary - clipDuration,
+            didSnap: true,
+            snapPosition: boundary,
+          };
+        }
+      }
+    }
+
+    if (bestSnapResult) {
+      return bestSnapResult;
+    }
+
+    return {
+      snappedFrame: candidateFrame,
+      didSnap: false,
+      snapPosition: null,
+    };
+  }, [snapBoundaries, snapThresholdFrames]);
+
   // useDrop フック
   const [{ isOver, canDrop }, drop] = useDrop(() => ({
     accept: ItemTypes.CLIP,
+    hover: (item, monitor) => {
+      if (!layerRef.current || !onSnapGuideShow || !onSnapGuideHide) return;
+
+      // ドラッグ中のスナップガイド表示
+      const offset = monitor.getClientOffset();
+      if (!offset) return;
+
+      const layerRect = layerRef.current.getBoundingClientRect();
+      const dropX = offset.x - layerRect.left;
+      // grabOffsetPx を引くことで、クリップ左端がドロップ位置に来るように補正
+      const grabOffsetPx = item.grabOffsetPx || 0;
+      const candidateFrame = Math.max(0, Math.round((dropX - grabOffsetPx) / pixelsPerFrame));
+
+      // Altキー状態を確認（Altでスナップ無効化）
+      const isAltPressed = window.__isAltPressed || false;
+
+      // クリップの長さを取得
+      const clipDuration = item.durationFrames || 0;
+
+      const snapResult = calculateSnappedFrame(candidateFrame, clipDuration, isAltPressed);
+
+      if (snapResult.didSnap) {
+        onSnapGuideShow(snapResult.snapPosition);
+      } else {
+        onSnapGuideHide();
+      }
+    },
     drop: (item, monitor) => {
       if (!layerRef.current) return;
 
-      // ドロップ位置を計算
+      // スナップガイドを非表示
+      if (onSnapGuideHide) {
+        onSnapGuideHide();
+      }
+
+      // ドロップ位置を計算（grabOffsetPx を使用してクリップ左端基準に補正）
       const offset = monitor.getClientOffset();
       const layerRect = layerRef.current.getBoundingClientRect();
       const dropX = offset.x - layerRect.left;
-      const newStartFrame = Math.max(0, Math.round(dropX / pixelsPerFrame));
+      // grabOffsetPx を引くことで、クリップ左端がドロップ位置に来るように補正
+      const grabOffsetPx = item.grabOffsetPx || 0;
+      const candidateFrame = Math.max(0, Math.round((dropX - grabOffsetPx) / pixelsPerFrame));
 
       // Altキー状態を確認（グローバル変数から取得）
       const isAltPressed = window.__isAltPressed || false;
+
+      // クリップの長さを取得
+      const clipDuration = item.durationFrames || 0;
+
+      // スナップ計算（Altでスナップ無効化）
+      const snapResult = calculateSnappedFrame(candidateFrame, clipDuration, isAltPressed);
+      const newStartFrame = Math.max(0, snapResult.snappedFrame);
 
       // 複数選択されている場合
       const clipIds = item.clipIds || [item.id];
@@ -86,7 +181,7 @@ function Layer({ layerId, layer, pixelsPerFrame }) {
       isOver: monitor.isOver(),
       canDrop: monitor.canDrop(),
     }),
-  }), [layerId, pixelsPerFrame, dispatch]);
+  }), [layerId, pixelsPerFrame, dispatch, calculateSnappedFrame, onSnapGuideShow, onSnapGuideHide]);
 
   // ref を結合
   const setRefs = (el) => {

@@ -7,14 +7,17 @@ import {
   selectSearchQuery,
   selectSelectedAssetId,
   addAssets,
+  updateAssetDuration,
   removeAsset,
   selectAsset,
   setFilter,
   setSearchQuery,
 } from '../../store/assetsSlice';
+import { selectFps } from '../../store/timelineSlice';
 import { Film, Image, Music, File, X, Plus, FolderOpen } from '../Icons';
 import { Button, IconButton, Input } from '../ui';
 import LayerCreationPanel from '../LayerCreation/LayerCreationPanel';
+import { getMediaDurationFrames } from '../../utils/mediaDuration';
 
 // ドラッグ用アイテムタイプ
 export const AssetItemTypes = {
@@ -100,7 +103,20 @@ function AssetPanel() {
   const filter = useSelector(selectFilter);
   const searchQuery = useSelector(selectSearchQuery);
   const selectedAssetId = useSelector(selectSelectedAssetId);
+  const fps = useSelector(selectFps);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Fetch actual duration for a file and update the asset
+  const fetchAndUpdateDuration = useCallback(async (filePath, assetType) => {
+    try {
+      const durationFrames = await getMediaDurationFrames(filePath, assetType, fps);
+      // Update by path since we don't have the ID at creation time
+      dispatch(updateAssetDuration({ path: filePath, duration: durationFrames }));
+    } catch (error) {
+      console.warn(`Failed to get duration for ${filePath}:`, error);
+      // Keep default duration on error
+    }
+  }, [dispatch, fps]);
 
   // ファイルドロップハンドラー
   const handleDragOver = useCallback((e) => {
@@ -123,16 +139,34 @@ function AssetPanel() {
     const files = Array.from(e.dataTransfer.files);
     if (files.length === 0) return;
 
-    const newAssets = files.map((file) => ({
-      name: file.name,
-      type: getAssetTypeFromFile(file.name),
-      path: file.path,
-      duration: 90, // デフォルト3秒
-      thumbnail: null,
-    }));
+    // Create assets with temporary default duration (will be updated async)
+    const newAssets = files.map((file) => {
+      const assetType = getAssetTypeFromFile(file.name);
+      // Use fps-aware default: 5 seconds for images, 3 seconds for others
+      const defaultDuration = assetType === 'image' ? Math.round(5 * fps) : Math.round(3 * fps);
+      return {
+        name: file.name,
+        type: assetType,
+        path: file.path,
+        duration: defaultDuration,
+        thumbnail: null,
+      };
+    });
 
+    // Add assets immediately with default duration
     dispatch(addAssets(newAssets));
-  }, [dispatch]);
+
+    // Fetch actual durations asynchronously and update
+    newAssets.forEach((asset, index) => {
+      const filePath = files[index].path;
+      const assetType = asset.type;
+
+      // Small delay to ensure asset is added before updating
+      setTimeout(() => {
+        fetchAndUpdateDuration(filePath, assetType);
+      }, 50);
+    });
+  }, [dispatch, fps, fetchAndUpdateDuration]);
 
   // ファイル選択ダイアログ
   const handleImportClick = useCallback(() => {
@@ -144,18 +178,33 @@ function AssetPanel() {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
 
-      const newAssets = files.map((file) => ({
-        name: file.name,
-        type: getAssetTypeFromFile(file.name),
-        path: file.path || URL.createObjectURL(file),
-        duration: 90,
-        thumbnail: null,
-      }));
+      // Create assets with temporary default duration
+      const newAssets = files.map((file) => {
+        const assetType = getAssetTypeFromFile(file.name);
+        const defaultDuration = assetType === 'image' ? Math.round(5 * fps) : Math.round(3 * fps);
+        return {
+          name: file.name,
+          type: assetType,
+          path: file.path || URL.createObjectURL(file),
+          duration: defaultDuration,
+          thumbnail: null,
+        };
+      });
 
       dispatch(addAssets(newAssets));
+
+      // Fetch actual durations for video/audio files
+      files.forEach((file, index) => {
+        const filePath = file.path || newAssets[index].path;
+        const assetType = newAssets[index].type;
+
+        setTimeout(() => {
+          fetchAndUpdateDuration(filePath, assetType);
+        }, 50);
+      });
     };
     input.click();
-  }, [dispatch]);
+  }, [dispatch, fps, fetchAndUpdateDuration]);
 
   const handleSelect = useCallback((id) => {
     dispatch(selectAsset(id));

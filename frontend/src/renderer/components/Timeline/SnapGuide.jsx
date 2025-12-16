@@ -13,13 +13,13 @@ const SnapGuide = ({ snapPosition, pixelsPerFrame, visible }) => {
 
   return (
     <div
-      className="absolute top-0 bottom-0 w-0.5 bg-accent-green z-20 pointer-events-none"
+      className="absolute top-0 bottom-0 w-0.5 bg-accent-cyan z-20 pointer-events-none"
       style={{ left: `${left}px` }}
     >
       {/* 上部のインジケーター */}
-      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-accent-green rounded-full" />
+      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-accent-cyan rounded-full shadow-[0_0_8px_rgba(60,207,218,0.7)]" />
       {/* 下部のインジケーター */}
-      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-accent-green rounded-full" />
+      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-accent-cyan rounded-full shadow-[0_0_8px_rgba(60,207,218,0.7)]" />
     </div>
   );
 };

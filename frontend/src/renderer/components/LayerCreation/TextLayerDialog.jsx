@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addClip, selectLayerOrder, selectLayers, saveToHistory } from '../../store/timelineSlice';
+import { addClip, selectLayerOrder, selectLayers, saveToHistory, selectFps } from '../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../ui';
 import { X } from '../Icons';
 import { FontSelector, FontStyleControls } from '../FontSelector';
@@ -12,6 +12,7 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
   const layerOrder = useSelector(selectLayerOrder);
   const layers = useSelector(selectLayers);
   const currentFrame = useSelector((state) => state.timeline.currentFrame);
+  const fps = useSelector(selectFps);
 
   // 設定状態
   const [textContent, setTextContent] = useState('テキストを入力');
@@ -233,7 +234,7 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
                 min={1}
               />
               <span className="text-xs text-ink-muted">
-                {(clipDuration / 30).toFixed(2)}秒 @ 30fps
+                {(clipDuration / fps).toFixed(2)}秒 @ {fps}fps
               </span>
             </div>
           </div>

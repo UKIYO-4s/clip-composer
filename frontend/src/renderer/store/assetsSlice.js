@@ -77,6 +77,20 @@ const assetsSlice = createSlice({
         asset.thumbnail = thumbnail;
       }
     },
+    // Update asset duration (by id or by path)
+    updateAssetDuration: (state, action) => {
+      const { id, path, duration } = action.payload;
+      let asset;
+      if (id) {
+        asset = state.items.find((a) => a.id === id);
+      } else if (path) {
+        // Find by path if id not provided
+        asset = state.items.find((a) => a.path === path);
+      }
+      if (asset) {
+        asset.duration = duration;
+      }
+    },
     // プロジェクトファイルからアセット状態を復元
     setAssets: (state, action) => {
       state.items = action.payload || [];
@@ -98,6 +112,7 @@ export const {
   setFilter,
   setSearchQuery,
   updateAssetThumbnail,
+  updateAssetDuration,
   setAssets,
   clearAssets,
 } = assetsSlice.actions;

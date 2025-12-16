@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addClip, selectLayerOrder, selectLayers, saveToHistory, selectResolution } from '../../store/timelineSlice';
+import { addClip, selectLayerOrder, selectLayers, saveToHistory, selectResolution, selectFps } from '../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../ui';
 import { X } from '../Icons';
 
@@ -21,6 +21,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const layers = useSelector(selectLayers);
   const currentFrame = useSelector((state) => state.timeline.currentFrame);
   const resolution = useSelector(selectResolution);
+  const fps = useSelector(selectFps);
 
   // ビデオレイヤーのみ抽出（useEffectより先に定義）
   const layerOptions = useMemo(() =>
@@ -110,9 +111,9 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
       startFrame: start,
       endFrame: endFrame,
       totalFrames: totalFrames,
-      totalSeconds: (totalFrames / 30).toFixed(2),
+      totalSeconds: (totalFrames / fps).toFixed(2),
     };
-  }, [calculateStartFrame, clipCount, clipDuration, placementMode, gapFrames]);
+  }, [calculateStartFrame, clipCount, clipDuration, placementMode, gapFrames, fps]);
 
   // 現在のアスペクト比を取得
   const currentAspectRatio = useMemo(() => {
@@ -288,7 +289,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
                 placeholder="60"
               />
               <span className="text-xs text-ink-muted">
-                {clipDuration ? `${(clipDuration / 30).toFixed(2)}秒 @ 30fps` : ''}
+                {clipDuration ? `${(clipDuration / fps).toFixed(2)}秒 @ ${fps}fps` : ''}
               </span>
             </div>
           </div>

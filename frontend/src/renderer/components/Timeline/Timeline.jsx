@@ -1,11 +1,17 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useDragLayer } from 'react-dnd';
 import { setCurrentFrame, addClip, clearSelection, addVideoLayer, addSoundLayer, removeLayer, removeClips, setPixelsPerFrame, saveToHistory, moveSelectedClipsToLayer } from '../../store/timelineSlice';
 import Layer from './Layer';
 import TransportControls from '../Controls/TransportControls';
 import MarqueeSelection from './MarqueeSelection';
 import ZoomControls from './ZoomControls';
+import SnapGuide from './SnapGuide';
 import { Plus, Minus } from '../Icons';
+import { getMediaDurationFrames } from '../../utils/mediaDuration';
+
+// スナップ閾値（ピクセル単位）
+const SNAP_THRESHOLD_PIXELS = 8;
 
 // ファイル拡張子からクリップタイプを判定
 const getClipTypeFromFile = (fileName) => {
@@ -56,6 +62,22 @@ function Timeline() {
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
   const [showTimecodeDialog, setShowTimecodeDialog] = useState(false);
   const [timecodeInput, setTimecodeInput] = useState('');
+  const [isLoadingDurations, setIsLoadingDurations] = useState(false);
+
+  // スナップガイド状態
+  const [activeSnapGuide, setActiveSnapGuide] = useState(null);
+
+  // ドラッグ状態を監視（スナップガイドの非表示用）
+  const { isDragging: isDndDragging } = useDragLayer((monitor) => ({
+    isDragging: monitor.isDragging(),
+  }));
+
+  // ドラッグ終了時にスナップガイドを非表示にする
+  useEffect(() => {
+    if (!isDndDragging && activeSnapGuide !== null) {
+      setActiveSnapGuide(null);
+    }
+  }, [isDndDragging, activeSnapGuide]);
 
   // Timeline height state with localStorage persistence
   const [timelineHeight, setTimelineHeight] = useState(() => {
@@ -93,6 +115,52 @@ function Timeline() {
 
     return [...videoLayers, ...soundLayers];
   }, [layerOrder]);
+
+  // スナップ境界を収集（メモ化）- ドラッグ中のクリップは除外
+  const snapBoundaries = useMemo(() => {
+    const boundaries = new Set();
+
+    // フレーム0を常に追加
+    boundaries.add(0);
+
+    // 現在の再生ヘッド位置を追加
+    boundaries.add(currentFrame);
+
+    // すべてのレイヤーのクリップ境界を収集（選択中のクリップは除外）
+    layerOrder.forEach((layerId) => {
+      const layer = layers[layerId];
+      if (!layer) return;
+
+      layer.clips.forEach((clip) => {
+        // ドラッグ中（選択中）のクリップは境界から除外
+        if (selectedClipIds.includes(clip.id)) {
+          return;
+        }
+        // クリップの開始フレーム
+        boundaries.add(clip.startFrame);
+        // クリップの終了フレーム
+        boundaries.add(clip.startFrame + clip.durationFrames);
+      });
+    });
+
+    // ソートされた配列に変換
+    return Array.from(boundaries).sort((a, b) => a - b);
+  }, [layers, layerOrder, currentFrame, selectedClipIds]);
+
+  // ピクセル閾値をフレーム数に変換
+  const snapThresholdFrames = useMemo(() => {
+    return Math.max(1, Math.round(SNAP_THRESHOLD_PIXELS / pixelsPerFrame));
+  }, [pixelsPerFrame]);
+
+  // スナップガイド表示ハンドラー
+  const handleSnapGuideShow = useCallback((position) => {
+    setActiveSnapGuide(position);
+  }, []);
+
+  // スナップガイド非表示ハンドラー
+  const handleSnapGuideHide = useCallback(() => {
+    setActiveSnapGuide(null);
+  }, []);
 
   // レイヤー削除可能かチェック（同タイプが2つ以上あれば削除可能）
   const canDeleteLayer = useCallback((layerId) => {
@@ -186,26 +254,54 @@ function Timeline() {
       dropFrame = Math.max(0, Math.round(x / pixelsPerFrame));
     }
 
-    // 履歴に保存
-    dispatch(saveToHistory());
+    // 各ファイルをクリップとして追加（並行で実長を取得）
+    const addClipsAsync = async () => {
+      setIsLoadingDurations(true);
 
-    // 各ファイルをクリップとして追加
-    files.forEach((file, index) => {
-      const clipType = getClipTypeFromFile(file.name);
-      const targetLayerId = getTargetLayerId(clipType, layers, layerOrder);
+      try {
+        // ファイル情報を準備
+        const fileInfos = files.map((file) => ({
+          file,
+          clipType: getClipTypeFromFile(file.name),
+          targetLayerId: getTargetLayerId(getClipTypeFromFile(file.name), layers, layerOrder),
+        }));
 
-      const newClip = {
-        id: `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: clipType,
-        name: file.name,
-        startFrame: dropFrame + index * 60, // 連続配置
-        durationFrames: 90, // デフォルト3秒（30fps）
-        filePath: file.path, // Electronではファイルパスが取得可能
-      };
+        // 全ファイルの長さを並行取得
+        const durations = await Promise.all(
+          fileInfos.map(({ file, clipType }) =>
+            getMediaDurationFrames(file.path, clipType, fps)
+          )
+        );
 
-      dispatch(addClip({ layerId: targetLayerId, clip: newClip }));
-    });
-  }, [pixelsPerFrame, layers, layerOrder, dispatch]);
+        // 履歴に保存（長さ取得後）
+        dispatch(saveToHistory());
+
+        // クリップを連続配置
+        let currentDropFrame = dropFrame;
+        fileInfos.forEach(({ file, clipType, targetLayerId }, index) => {
+          const durationFrames = durations[index];
+
+          const newClip = {
+            id: `clip-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+            type: clipType,
+            name: file.name,
+            startFrame: currentDropFrame,
+            durationFrames: durationFrames,
+            filePath: file.path,
+          };
+
+          dispatch(addClip({ layerId: targetLayerId, clip: newClip }));
+
+          // 次のクリップは現在のクリップの終了位置から配置
+          currentDropFrame += durationFrames;
+        });
+      } finally {
+        setIsLoadingDurations(false);
+      }
+    };
+
+    addClipsAsync();
+  }, [pixelsPerFrame, layers, layerOrder, dispatch, fps]);
 
   // フレームをタイムコードに変換 (HH:MM:SS:FF)
   const frameToTimecode = (frame) => {
@@ -694,6 +790,10 @@ function Timeline() {
                     layerId={layerId}
                     layer={layers[layerId]}
                     pixelsPerFrame={pixelsPerFrame}
+                    snapBoundaries={snapBoundaries}
+                    snapThresholdFrames={snapThresholdFrames}
+                    onSnapGuideShow={handleSnapGuideShow}
+                    onSnapGuideHide={handleSnapGuideHide}
                   />
                   {/* VideoとSoundの間のスペーサー（追加ボタン行に対応） */}
                   {isLastVideo && (
@@ -719,6 +819,13 @@ function Timeline() {
               {/* 再生ヘッドのつまみ */}
               <div className="absolute -top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent-red rounded-sm" />
             </div>
+
+            {/* スナップガイド */}
+            <SnapGuide
+              snapPosition={activeSnapGuide}
+              pixelsPerFrame={pixelsPerFrame}
+              visible={activeSnapGuide !== null}
+            />
           </div>
         </div>
       </div>
@@ -731,6 +838,16 @@ function Timeline() {
         <div className="absolute inset-0 bg-accent-blue/20 pointer-events-none flex items-center justify-center">
           <div className="bg-surface-raised px-4 py-2 rounded-lg text-white text-sm">
             ファイルをドロップして追加
+          </div>
+        </div>
+      )}
+
+      {/* 長さ取得中のオーバーレイ */}
+      {isLoadingDurations && (
+        <div className="absolute inset-0 bg-black/40 pointer-events-none flex items-center justify-center z-50">
+          <div className="bg-surface-raised px-6 py-3 rounded-lg text-white text-sm flex items-center gap-3">
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            メディアの長さを取得中...
           </div>
         </div>
       )}
