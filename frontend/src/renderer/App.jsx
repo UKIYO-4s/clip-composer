@@ -516,6 +516,16 @@ function App() {
         return;
       }
 
+      // Delete/Backspace: クリップ削除（選択クリップがある場合のみ）
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedClipIds.length > 0) {
+          e.preventDefault();
+          dispatch(saveToHistory());
+          dispatch(removeClips({ clipIds: selectedClipIds }));
+        }
+        return;
+      }
+
       // 以下はクリップ選択時のみ有効
       if (!selectedClipId) {
         return;
@@ -536,17 +546,6 @@ function App() {
 
       if (!selectedLayerId || !selectedClip) {
         return;
-      }
-
-      // Delete/Backspace: クリップ削除
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        dispatch(saveToHistory());
-        if (selectedClipIds.length > 1) {
-          dispatch(removeClips({ clipIds: selectedClipIds }));
-        } else if (selectedClipId && selectedLayerId) {
-          dispatch(removeClip({ layerId: selectedLayerId, clipId: selectedClipId }));
-        }
       }
 
       // S: 再生ヘッド位置で分割
@@ -753,7 +752,7 @@ function App() {
         <ExportDialog />
 
         {/* New Project Dialog */}
-        <NewProjectDialog />
+        <NewProjectDialog onLoadProject={handleLoadProject} />
       </div>
     </DndProvider>
   );

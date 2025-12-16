@@ -72,7 +72,7 @@ const ZoomControls = ({ timelineRef }) => {
       <button
         onClick={handleZoomOut}
         className="p-1 hover:bg-state-hover rounded text-ink-secondary hover:text-ink-primary transition-colors"
-        title="縮小 (-)"
+        title="ズームアウト (Option + ホイール下)"
       >
         <Minus className="w-4 h-4" />
       </button>
@@ -86,13 +86,14 @@ const ZoomControls = ({ timelineRef }) => {
         value={pixelsPerFrame}
         onChange={handleSliderChange}
         className="w-24 h-1 bg-surface-sunken rounded appearance-none cursor-pointer accent-accent-blue"
+        title={`ズームレベル: ${zoomPercent}% (ドラッグで調整、または Option + ホイールでズーム)`}
       />
 
       {/* ズームイン */}
       <button
         onClick={handleZoomIn}
         className="p-1 hover:bg-state-hover rounded text-ink-secondary hover:text-ink-primary transition-colors"
-        title="拡大 (+)"
+        title="ズームイン (Option + ホイール上)"
       >
         <Plus className="w-4 h-4" />
       </button>
@@ -104,7 +105,7 @@ const ZoomControls = ({ timelineRef }) => {
       <button
         onClick={handleFitToView}
         className="flex items-center gap-1 px-2 py-1 text-xs text-ink-secondary hover:bg-state-hover rounded transition-colors"
-        title="全体表示 (Ctrl+0)"
+        title="全体表示: 全てのクリップが画面内に収まるようにズームを調整します"
       >
         <Maximize className="w-3 h-3" />
         全体表示

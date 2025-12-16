@@ -44,36 +44,243 @@ const TextInput = ({ value, onChange, ...props }) => (
   />
 );
 
-// 数値入力
-const NumberInput = ({ value, onChange, min, max, step = 1, ...props }) => (
-  <Input
-    type="number"
-    value={value ?? 0}
-    onChange={(e) => onChange(parseFloat(e.target.value))}
-    min={min}
-    max={max}
-    step={step}
-    {...props}
-  />
-);
+// 数値入力（バリデーション付き）
+const NumberInput = ({ value, onChange, min, max, step = 1, ...props }) => {
+  const [localValue, setLocalValue] = useState(String(value ?? 0));
+  const [error, setError] = useState(null);
+  const lastValidValue = React.useRef(value ?? 0);
 
-// スライダー
-const Slider = ({ value, onChange, min, max, step = 1, suffix = '' }) => (
-  <div className="flex items-center gap-2">
-    <input
-      type="range"
-      value={value ?? min}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
+  // 外部からの値変更を反映
+  useEffect(() => {
+    if (!isNaN(value) && value !== null && value !== undefined) {
+      setLocalValue(String(value));
+      lastValidValue.current = value;
+      setError(null);
+    }
+  }, [value]);
+
+  const validateAndCommit = (inputValue) => {
+    const parsed = parseFloat(inputValue);
+
+    // NaN または空文字列の場合
+    if (isNaN(parsed) || inputValue.trim() === '') {
+      setError('無効な数値です');
+      setLocalValue(String(lastValidValue.current));
+      return;
+    }
+
+    // 範囲外の場合はクランプ
+    let clamped = parsed;
+    if (min !== undefined && parsed < min) {
+      clamped = min;
+    }
+    if (max !== undefined && parsed > max) {
+      clamped = max;
+    }
+
+    setError(null);
+    setLocalValue(String(clamped));
+    lastValidValue.current = clamped;
+    onChange(clamped);
+  };
+
+  const handleBlur = () => {
+    validateAndCommit(localValue);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      validateAndCommit(localValue);
+      e.target.blur();
+    }
+  };
+
+  return (
+    <Input
+      type="number"
+      value={localValue}
+      onChange={(e) => {
+        setLocalValue(e.target.value);
+        setError(null); // 入力中はエラーをクリア
+      }}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
       min={min}
       max={max}
       step={step}
-      className="flex-1 accent-accent-blue"
+      error={error}
+      {...props}
     />
-    <span className="text-xs text-ink-muted w-16 text-right">
-      {value ?? min}{suffix}
-    </span>
-  </div>
-);
+  );
+};
+
+// スライダー（バリデーション付き）
+const Slider = ({ value, onChange, min, max, step = 1, suffix = '' }) => {
+  const [localValue, setLocalValue] = useState(String(value ?? min));
+  const [error, setError] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const lastValidValue = React.useRef(value ?? min);
+
+  // 外部からの値変更を反映（編集中でない場合のみ）
+  useEffect(() => {
+    if (!isEditing && !isNaN(value) && value !== null && value !== undefined) {
+      setLocalValue(String(value));
+      lastValidValue.current = value;
+      setError(null);
+    }
+  }, [value, isEditing]);
+
+  const validateAndCommit = (inputValue) => {
+    const parsed = parseFloat(inputValue);
+
+    // NaN または空文字列の場合
+    if (isNaN(parsed) || inputValue.trim() === '') {
+      setError('無効な数値です');
+      setLocalValue(String(lastValidValue.current));
+      return;
+    }
+
+    // 範囲外の場合はクランプ
+    let clamped = parsed;
+    if (min !== undefined && parsed < min) {
+      clamped = min;
+    }
+    if (max !== undefined && parsed > max) {
+      clamped = max;
+    }
+
+    setError(null);
+    setLocalValue(String(clamped));
+    lastValidValue.current = clamped;
+    onChange(clamped);
+  };
+
+  const handleSliderChange = (e) => {
+    const parsed = parseFloat(e.target.value);
+    setLocalValue(String(parsed));
+    lastValidValue.current = parsed;
+    setError(null);
+    onChange(parsed);
+  };
+
+  const handleInputBlur = () => {
+    setIsEditing(false);
+    validateAndCommit(localValue);
+  };
+
+  const handleInputKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      validateAndCommit(localValue);
+      e.target.blur();
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="range"
+        value={parseFloat(localValue) || min}
+        onChange={handleSliderChange}
+        min={min}
+        max={max}
+        step={step}
+        className="flex-1 accent-accent-blue"
+      />
+      <input
+        type="number"
+        value={localValue}
+        onChange={(e) => {
+          setIsEditing(true);
+          setLocalValue(e.target.value);
+          setError(null);
+        }}
+        onBlur={handleInputBlur}
+        onKeyDown={handleInputKeyDown}
+        min={min}
+        max={max}
+        step={step}
+        className={`w-14 text-xs text-right px-1 py-0.5 bg-surface-sunken border rounded focus:outline-none focus:border-accent-blue ${
+          error ? 'border-accent-red text-accent-red' : 'border-line'
+        }`}
+        title={error || undefined}
+      />
+      <span className="text-xs text-ink-muted w-4">{suffix}</span>
+    </div>
+  );
+};
+
+// 一括適用用の数値入力（バリデーション付き）
+const BulkNumberInput = ({ value, onChange, min, max, step = 1, disabled, className = '', ...props }) => {
+  const [localValue, setLocalValue] = useState(String(value ?? 0));
+  const [error, setError] = useState(null);
+  const lastValidValue = React.useRef(value ?? 0);
+
+  // 外部からの値変更を反映
+  useEffect(() => {
+    if (!isNaN(value) && value !== null && value !== undefined) {
+      setLocalValue(String(value));
+      lastValidValue.current = value;
+      setError(null);
+    }
+  }, [value]);
+
+  const validateAndCommit = (inputValue) => {
+    const parsed = parseFloat(inputValue);
+
+    // NaN または空文字列の場合
+    if (isNaN(parsed) || inputValue.trim() === '') {
+      setError('無効な数値です');
+      setLocalValue(String(lastValidValue.current));
+      // 一括適用の場合、無効値は保存しない（前の有効値を維持）
+      return;
+    }
+
+    // 範囲外の場合はクランプ
+    let clamped = parsed;
+    if (min !== undefined && parsed < min) {
+      clamped = min;
+    }
+    if (max !== undefined && parsed > max) {
+      clamped = max;
+    }
+
+    setError(null);
+    setLocalValue(String(clamped));
+    lastValidValue.current = clamped;
+    onChange(clamped);
+  };
+
+  const handleBlur = () => {
+    validateAndCommit(localValue);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      validateAndCommit(localValue);
+      e.target.blur();
+    }
+  };
+
+  return (
+    <Input
+      type="number"
+      value={localValue}
+      onChange={(e) => {
+        setLocalValue(e.target.value);
+        setError(null);
+      }}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      min={min}
+      max={max}
+      step={step}
+      disabled={disabled}
+      error={error}
+      className={className}
+      {...props}
+    />
+  );
+};
 
 // カラーピッカー
 const ColorPicker = ({ value, onChange }) => (
@@ -213,13 +420,12 @@ const PropertyPanel = () => {
                   className="w-4 h-4 accent-accent-blue"
                 />
                 <label className="text-xs text-ink-muted w-20">位置 X</label>
-                <Input
-                  type="number"
+                <BulkNumberInput
                   value={bulkProperties.positionX.value}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     setBulkProperties((prev) => ({
                       ...prev,
-                      positionX: { ...prev.positionX, value: parseFloat(e.target.value) || 0 },
+                      positionX: { ...prev.positionX, value },
                     }))
                   }
                   disabled={!bulkProperties.positionX.enabled}
@@ -242,13 +448,12 @@ const PropertyPanel = () => {
                   className="w-4 h-4 accent-accent-blue"
                 />
                 <label className="text-xs text-ink-muted w-20">位置 Y</label>
-                <Input
-                  type="number"
+                <BulkNumberInput
                   value={bulkProperties.positionY.value}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     setBulkProperties((prev) => ({
                       ...prev,
-                      positionY: { ...prev.positionY, value: parseFloat(e.target.value) || 0 },
+                      positionY: { ...prev.positionY, value },
                     }))
                   }
                   disabled={!bulkProperties.positionY.enabled}
@@ -271,13 +476,12 @@ const PropertyPanel = () => {
                   className="w-4 h-4 accent-accent-blue"
                 />
                 <label className="text-xs text-ink-muted w-20">スケール</label>
-                <Input
-                  type="number"
+                <BulkNumberInput
                   value={bulkProperties.scale.value}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     setBulkProperties((prev) => ({
                       ...prev,
-                      scale: { ...prev.scale, value: parseFloat(e.target.value) || 0 },
+                      scale: { ...prev.scale, value },
                     }))
                   }
                   disabled={!bulkProperties.scale.enabled}
@@ -355,15 +559,14 @@ const PropertyPanel = () => {
                 {bulkProperties.transition_in.enabled && bulkProperties.transition_in.type !== 'none' && (
                   <div className="ml-6 flex items-center gap-2">
                     <label className="text-xs text-ink-muted w-16">フレーム数</label>
-                    <Input
-                      type="number"
+                    <BulkNumberInput
                       value={bulkProperties.transition_in.duration_frames}
-                      onChange={(e) =>
+                      onChange={(value) =>
                         setBulkProperties((prev) => ({
                           ...prev,
                           transition_in: {
                             ...prev.transition_in,
-                            duration_frames: Math.max(1, parseInt(e.target.value) || 1),
+                            duration_frames: value,
                           },
                         }))
                       }

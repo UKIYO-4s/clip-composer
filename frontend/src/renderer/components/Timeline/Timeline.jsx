@@ -4,6 +4,7 @@ import { setCurrentFrame, addClip, clearSelection, addVideoLayer, addSoundLayer,
 import Layer from './Layer';
 import TransportControls from '../Controls/TransportControls';
 import MarqueeSelection from './MarqueeSelection';
+import ZoomControls from './ZoomControls';
 import { Plus, Minus } from '../Icons';
 
 // ファイル拡張子からクリップタイプを判定
@@ -29,6 +30,12 @@ const getTargetLayerId = (clipType, layers, layerOrder) => {
   return layerOrder.find((id) => layers[id].type === 'video') || 'V1';
 };
 
+// Constants for timeline height constraints
+const MIN_TIMELINE_HEIGHT = 200; // Minimum height in pixels
+const MAX_TIMELINE_HEIGHT = 600; // Maximum height in pixels
+const DEFAULT_TIMELINE_HEIGHT = 256; // Default height (h-64 = 16rem = 256px)
+const TIMELINE_HEIGHT_STORAGE_KEY = 'clip-composer-timeline-height';
+
 function Timeline() {
   const dispatch = useDispatch();
   const {
@@ -44,10 +51,24 @@ function Timeline() {
   const timelineRef = useRef(null);
   const rulerRef = useRef(null);
   const timecodeInputRef = useRef(null);
+  const containerRef = useRef(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
   const [showTimecodeDialog, setShowTimecodeDialog] = useState(false);
   const [timecodeInput, setTimecodeInput] = useState('');
+
+  // Timeline height state with localStorage persistence
+  const [timelineHeight, setTimelineHeight] = useState(() => {
+    const saved = localStorage.getItem(TIMELINE_HEIGHT_STORAGE_KEY);
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed >= MIN_TIMELINE_HEIGHT && parsed <= MAX_TIMELINE_HEIGHT) {
+        return parsed;
+      }
+    }
+    return DEFAULT_TIMELINE_HEIGHT;
+  });
+  const [isResizing, setIsResizing] = useState(false);
 
   // レイヤー表示順序をソート
   // Video: 番号が大きいほど上（V3, V2, V1）
@@ -337,24 +358,6 @@ function Timeline() {
     };
   }, []);
 
-  // Delete/Backspace キーで選択クリップを削除
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Delete または Backspace キー
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClipIds.length > 0) {
-        // テキスト入力中は無視
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-        e.preventDefault();
-        dispatch(saveToHistory());
-        dispatch(removeClips({ clipIds: selectedClipIds }));
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedClipIds, dispatch]);
-
   // Option+マウスホイールでズームイン/アウト
   const handleWheel = useCallback((e) => {
     // Option（Alt）キー押下中のみズーム処理
@@ -422,6 +425,49 @@ function Timeline() {
     }
   }, [currentFrame, pixelsPerFrame]);
 
+  // Timeline resize handlers
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const handleResizeMove = useCallback((e) => {
+    if (!isResizing || !containerRef.current) return;
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    // Calculate new height based on mouse position (dragging up increases height)
+    const newHeight = containerRect.bottom - e.clientY;
+    const clampedHeight = Math.max(MIN_TIMELINE_HEIGHT, Math.min(MAX_TIMELINE_HEIGHT, newHeight));
+
+    setTimelineHeight(clampedHeight);
+  }, [isResizing]);
+
+  const handleResizeEnd = useCallback(() => {
+    if (isResizing) {
+      setIsResizing(false);
+      // Save to localStorage
+      localStorage.setItem(TIMELINE_HEIGHT_STORAGE_KEY, timelineHeight.toString());
+    }
+  }, [isResizing, timelineHeight]);
+
+  // Global mouse events for resize
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', handleResizeMove);
+      window.addEventListener('mouseup', handleResizeEnd);
+      // Prevent text selection during resize
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'ns-resize';
+
+      return () => {
+        window.removeEventListener('mousemove', handleResizeMove);
+        window.removeEventListener('mouseup', handleResizeEnd);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      };
+    }
+  }, [isResizing, handleResizeMove, handleResizeEnd]);
+
   // 背景クリックで選択解除
   const handleBackgroundClick = useCallback((e) => {
     // クリップやルーラー上のクリックは無視
@@ -461,13 +507,27 @@ function Timeline() {
 
   return (
     <div
-      className={`flex flex-col h-64 bg-surface-sunken border-t border-line ${
+      ref={containerRef}
+      className={`flex flex-col bg-surface-sunken border-t border-line relative ${
         isDragOver ? 'ring-2 ring-accent-blue ring-inset' : ''
       }`}
+      style={{ height: `${timelineHeight}px` }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Resize Handle */}
+      <div
+        className={`absolute top-0 left-0 right-0 h-2 cursor-ns-resize z-20 group flex items-center justify-center
+          ${isResizing ? 'bg-accent-blue/30' : 'hover:bg-line/50'}`}
+        onMouseDown={handleResizeStart}
+      >
+        {/* Visible grip indicator */}
+        <div className={`w-12 h-1 rounded-full transition-colors
+          ${isResizing ? 'bg-accent-blue' : 'bg-line group-hover:bg-ink-muted'}`}
+        />
+      </div>
+
       {/* トランスポートコントロール */}
       <TransportControls />
 
@@ -662,6 +722,9 @@ function Timeline() {
           </div>
         </div>
       </div>
+
+      {/* ズームコントロール */}
+      <ZoomControls timelineRef={timelineRef} />
 
       {/* ドラッグオーバー時のオーバーレイ */}
       {isDragOver && (
