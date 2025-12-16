@@ -127,10 +127,13 @@ function ExportDialog() {
 
   // 出力ディレクトリ選択（CSV一括書き出し用）
   const handleSelectOutputDir = async () => {
+    console.log('handleSelectOutputDir called');
     try {
+      console.log('Calling window.api.selectDirectory...');
       const result = await window.api.selectDirectory({
         title: '出力先フォルダを選択',
       });
+      console.log('selectDirectory result:', result);
       if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
         setOutputPath(result.filePaths[0]);
       }
@@ -141,11 +144,14 @@ function ExportDialog() {
 
   // CSVファイル選択
   const handleSelectCsv = async () => {
+    console.log('handleSelectCsv called');
     try {
+      console.log('Calling window.api.openFile...');
       const result = await window.api.openFile({
         filters: [{ name: 'CSV Files', extensions: ['csv'] }],
         properties: ['openFile'],
       });
+      console.log('openFile result:', result);
       if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
         dispatch(setCsvPath(result.filePaths[0]));
       }
@@ -320,12 +326,22 @@ function ExportDialog() {
     try {
       // 進捗リスナーを設定
       const removeProgressListener = window.api.python.onProgress((data) => {
+        // 経過時間と残り時間を計算
+        const elapsed = (Date.now() - batchStartTime) / 1000;
+
         // バッチ処理の進捗を処理
         if (data.current !== undefined && data.total !== undefined) {
+          const progressPercent = data.total > 0 ? (data.current / data.total) * 100 : 0;
+          const remaining = progressPercent > 0
+            ? (elapsed / progressPercent) * (100 - progressPercent)
+            : 0;
+
           dispatch(updateBatchProgress({
             current: data.current,
             total: data.total,
             message: data.message || `処理中... (${data.current}/${data.total})`,
+            elapsedTime: elapsed,
+            estimatedRemaining: remaining,
           }));
         }
 

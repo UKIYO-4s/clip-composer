@@ -257,7 +257,11 @@ def handle_render_batch(params: dict, handler: IPCHandler):
         max_workers=max_workers
     )
 
-    return result
+    # UI側で扱いやすいように success フラグとデータを同梱して返す
+    return {
+        "success": result.get("error_count", 0) == 0,
+        "data": result
+    }
 
 
 if __name__ == "__main__":

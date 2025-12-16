@@ -23,8 +23,18 @@ export default {
     // PyInstallerでビルドされたPythonバックエンド
     {
       from: 'backend/dist/clip_composer_backend',
-      to: 'backend',
+      to: 'backend/clip_composer_backend',
       filter: ['**/*'],
+    },
+    // フォールバック用: Pythonソースファイル（システムPythonで実行用）
+    {
+      from: 'backend/main.py',
+      to: 'backend/main.py',
+    },
+    {
+      from: 'backend/modules',
+      to: 'backend/modules',
+      filter: ['**/*.py'],
     },
     // FFmpegバイナリ
     {

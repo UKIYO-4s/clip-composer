@@ -3,6 +3,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const { getLicenseManager } = require('./license/LicenseManager.cjs');
+const fs = require('fs');
 
 // UUID v4生成（crypto.randomUUID()を使用）
 const uuidv4 = () => crypto.randomUUID();
@@ -34,57 +35,100 @@ class PythonBridge {
     this.process = null;
     this.buffer = '';
     this.isReady = false;
+    this.candidates = [];
+    this.currentCandidateIndex = -1;
+    this.isStarting = false;
+  }
+
+  buildCandidates() {
+    const candidates = [];
+    const backendDirDev = path.join(__dirname, '../../backend');
+    const venvPython = path.join(backendDirDev, 'venv/bin/python');
+    const scriptPathDev = path.join(backendDirDev, 'main.py');
+
+    if (isDev && fs.existsSync(venvPython) && fs.existsSync(scriptPathDev)) {
+      candidates.push({
+        label: 'venv python (dev)',
+        executablePath: venvPython,
+        executableArgs: [scriptPathDev, '--ipc'],
+        backendDir: backendDirDev,
+        ffmpegDir: '/usr/local/bin',
+      });
+    }
+
+    if (!isDev) {
+      const bundledBackend = path.join(process.resourcesPath, 'backend/clip_composer_backend');
+      const bundledDir = path.join(process.resourcesPath, 'backend');
+      if (fs.existsSync(bundledBackend)) {
+        candidates.push({
+          label: 'bundled backend binary',
+          executablePath: bundledBackend,
+          executableArgs: ['--ipc'],
+          backendDir: bundledDir,
+          ffmpegDir: path.join(process.resourcesPath, 'bin'),
+        });
+      }
+
+      // フォールバック: システムPythonでmain.pyを実行
+      const scriptPathProd = path.join(process.resourcesPath, 'backend/main.py');
+      if (fs.existsSync(scriptPathProd)) {
+        candidates.push({
+          label: 'system python main.py',
+          executablePath: 'python3',
+          executableArgs: [scriptPathProd, '--ipc'],
+          backendDir: path.join(process.resourcesPath, 'backend'),
+          ffmpegDir: path.join(process.resourcesPath, 'bin'),
+        });
+      }
+    }
+
+    // 最終フォールバック: システムpython + dev main.py（開発用リカバリー）
+    if (fs.existsSync(scriptPathDev)) {
+      candidates.push({
+        label: 'system python dev main.py',
+        executablePath: 'python3',
+        executableArgs: [scriptPathDev, '--ipc'],
+        backendDir: backendDirDev,
+        ffmpegDir: '/usr/local/bin',
+      });
+    }
+
+    return candidates;
   }
 
   start() {
+    if (this.isStarting) return;
     if (this.process) {
       console.log('Python process already running');
       return;
     }
 
-    // Python パスを解決
-    const fs = require('fs');
-    let executablePath;
-    let executableArgs;
-    let backendDir;
+    this.isStarting = true;
+    this.candidates = this.buildCandidates();
+    this.currentCandidateIndex = -1;
+    this._startNextCandidate();
+    this.isStarting = false;
+  }
 
-    if (isDev) {
-      // 開発環境: venv を使用
-      const pythonPath = path.join(__dirname, '../../backend/venv/bin/python');
-      const scriptPath = path.join(__dirname, '../../backend/main.py');
-      executablePath = pythonPath;
-      executableArgs = [scriptPath, '--ipc'];
-      backendDir = path.join(__dirname, '../../backend');
-    } else {
-      // 本番環境: PyInstallerでビルドされた実行ファイルを使用
-      const bundledBackend = path.join(process.resourcesPath, 'backend/clip_composer_backend');
-
-      if (fs.existsSync(bundledBackend)) {
-        executablePath = bundledBackend;
-        executableArgs = ['--ipc'];
-        backendDir = path.join(process.resourcesPath, 'backend');
-        console.log('Using bundled PyInstaller backend');
-      } else {
-        // フォールバック: システムPythonを使用
-        console.log('Bundled backend not found, falling back to system Python');
-        const scriptPath = path.join(process.resourcesPath, 'backend/main.py');
-        executablePath = 'python3';
-        executableArgs = [scriptPath, '--ipc'];
-        backendDir = path.join(process.resourcesPath, 'backend');
-      }
+  _startNextCandidate() {
+    this.stop();
+    this.currentCandidateIndex += 1;
+    if (this.currentCandidateIndex >= this.candidates.length) {
+      console.error('No more backend candidates to try');
+      this.isReady = false;
+      return;
     }
 
-    // FFmpegパスを設定
-    let ffmpegDir;
-    if (isDev) {
-      // 開発環境: システムのFFmpegを使用
-      ffmpegDir = '/usr/local/bin';
-    } else {
-      // 本番環境: バンドルされたFFmpegを使用
-      ffmpegDir = path.join(process.resourcesPath, 'bin');
-    }
+    const candidate = this.candidates[this.currentCandidateIndex];
+    const {
+      executablePath,
+      executableArgs,
+      backendDir,
+      ffmpegDir,
+      label,
+    } = candidate;
 
-    console.log('Starting backend process:', executablePath, executableArgs.join(' '));
+    console.log(`Starting backend process (${label}):`, executablePath, executableArgs.join(' '));
     console.log('FFmpeg directory:', ffmpegDir);
 
     try {
@@ -119,12 +163,27 @@ class PythonBridge {
       this.process.on('error', (error) => {
         console.error('Python process error:', error);
         this.isReady = false;
+        this._rejectAllPending(new Error('Python process error: ' + error.message));
+        this._startNextCandidate();
       });
+
+      if (this.process.stdin) {
+        this.process.stdin.on('error', (err) => {
+          console.error('Python stdin error:', err);
+          this.isReady = false;
+          this._startNextCandidate();
+          this._rejectAllPending(new Error('Python process stdin error: ' + err.message));
+        });
+      }
 
       this.process.on('close', (code) => {
         console.log('Python process exited with code:', code);
         this.process = null;
         this.isReady = false;
+        this._rejectAllPending(new Error(`Python process exited (code ${code})`));
+        if (code !== 0) {
+          this._startNextCandidate();
+        }
       });
 
       this.isReady = true;
@@ -132,6 +191,8 @@ class PythonBridge {
     } catch (error) {
       console.error('Failed to start Python process:', error);
       this.isReady = false;
+      this._rejectAllPending(new Error('Failed to start Python process: ' + error.message));
+      this._startNextCandidate();
     }
   }
 
@@ -146,6 +207,13 @@ class PythonBridge {
       if (!line.trim()) continue;
 
       try {
+        const trimmed = line.trim();
+        // JSON以外の標準出力（printデバッグなど）はスキップ
+        if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+          console.log('Python stdout (non-JSON):', trimmed);
+          continue;
+        }
+
         const response = JSON.parse(line);
         this.handleResponse(response);
       } catch (error) {
@@ -161,6 +229,11 @@ class PythonBridge {
     if (status === 'progress') {
       if (mainWindow) {
         mainWindow.webContents.send('python-progress', data);
+      }
+      // 進捗受信時にタイムアウトをリセット（ハートビート）
+      const pending = pendingRequests.get(id);
+      if (pending && pending.resetTimeout) {
+        pending.resetTimeout();
       }
       return;
     }
@@ -208,20 +281,40 @@ class PythonBridge {
         timeoutMs = 3600000; // 1時間
       }
 
-      const timeout = setTimeout(() => {
-        pendingRequests.delete(id);
-        reject(new Error('Request timeout'));
-      }, timeoutMs);
+      // 進捗受信用のハートビートタイムアウト（5分）
+      const heartbeatTimeoutMs = 300000;
+      let currentTimeout = null;
+
+      // タイムアウトを設定する関数
+      const setTimeoutTimer = (ms) => {
+        if (currentTimeout) {
+          clearTimeout(currentTimeout);
+        }
+        currentTimeout = setTimeout(() => {
+          pendingRequests.delete(id);
+          reject(new Error('Request timeout'));
+        }, ms);
+      };
+
+      // 初回タイムアウト設定
+      setTimeoutTimer(timeoutMs);
+
+      // タイムアウトをリセットする関数（進捗受信時に呼ばれる）
+      const resetTimeout = () => {
+        // 進捗を受信したらハートビートタイムアウトにリセット
+        setTimeoutTimer(heartbeatTimeoutMs);
+      };
 
       pendingRequests.set(id, {
         resolve: (data) => {
-          clearTimeout(timeout);
+          if (currentTimeout) clearTimeout(currentTimeout);
           resolve(data);
         },
         reject: (error) => {
-          clearTimeout(timeout);
+          if (currentTimeout) clearTimeout(currentTimeout);
           reject(error);
         },
+        resetTimeout,
       });
 
       // リクエスト送信
@@ -231,12 +324,17 @@ class PythonBridge {
           this.process.stdin.write(jsonLine);
         } else {
           pendingRequests.delete(id);
-          clearTimeout(timeout);
+          if (currentTimeout) clearTimeout(currentTimeout);
+          this.isReady = false;
+          this.stop();
           reject(new Error('Python process stdin not available'));
         }
       } catch (writeError) {
         pendingRequests.delete(id);
-        clearTimeout(timeout);
+        if (currentTimeout) clearTimeout(currentTimeout);
+        // パイプが死んだ場合はプロセスをリスタートできるように停止しておく
+        this.isReady = false;
+        this.stop();
         reject(new Error('Failed to write to Python process: ' + writeError.message));
       }
     });
@@ -248,6 +346,15 @@ class PythonBridge {
       this.process = null;
       this.isReady = false;
     }
+  }
+
+  _rejectAllPending(error) {
+    pendingRequests.forEach((pending) => {
+      if (pending.reject) {
+        pending.reject(error);
+      }
+    });
+    pendingRequests.clear();
   }
 }
 
@@ -609,33 +716,75 @@ ipcMain.handle('save-file', async (event, options = {}) => {
 
 // ファイルを開くダイアログ
 ipcMain.handle('open-file', async (event, options = {}) => {
+  console.log('open-file handler called with options:', options);
+
   const properties = ['openFile'];
   if (options.allowMultiple) {
     properties.push('multiSelections');
   }
 
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: properties,
-    filters: options.filters || [{ name: 'CSV Files', extensions: ['csv'] }],
-  });
+  // mainWindowがnullの場合はnullを渡す（モードレスダイアログ）
+  const parentWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
 
-  return {
-    canceled: result.canceled,
-    filePaths: result.filePaths || [],
-  };
+  try {
+    // ウィンドウをフォーカス
+    if (parentWindow) {
+      parentWindow.focus();
+    }
+
+    const result = await dialog.showOpenDialog(parentWindow, {
+      properties: properties,
+      filters: options.filters || [{ name: 'CSV Files', extensions: ['csv'] }],
+    });
+
+    console.log('open-file dialog result:', result);
+
+    return {
+      canceled: result.canceled,
+      filePaths: result.filePaths || [],
+    };
+  } catch (error) {
+    console.error('open-file dialog error:', error);
+    return {
+      canceled: true,
+      filePaths: [],
+      error: error.message,
+    };
+  }
 });
 
 // ディレクトリ選択ダイアログ
 ipcMain.handle('select-directory', async (event, options = {}) => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory', 'createDirectory'],
-    ...options,
-  });
+  console.log('select-directory handler called with options:', options);
 
-  return {
-    canceled: result.canceled,
-    filePaths: result.filePaths || [],
-  };
+  // mainWindowがnullの場合はnullを渡す（モードレスダイアログ）
+  const parentWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+
+  try {
+    // ウィンドウをフォーカス
+    if (parentWindow) {
+      parentWindow.focus();
+    }
+
+    const result = await dialog.showOpenDialog(parentWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+      ...options,
+    });
+
+    console.log('select-directory dialog result:', result);
+
+    return {
+      canceled: result.canceled,
+      filePaths: result.filePaths || [],
+    };
+  } catch (error) {
+    console.error('select-directory dialog error:', error);
+    return {
+      canceled: true,
+      filePaths: [],
+      error: error.message,
+    };
+  }
 });
 
 // プロジェクト保存ダイアログ

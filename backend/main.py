@@ -256,4 +256,14 @@ def main():
 
 
 if __name__ == "__main__":
+    # 並列処理時にPyInstaller配布版でも安定するように初期化
+    try:
+        import multiprocessing
+
+        multiprocessing.freeze_support()
+        multiprocessing.set_start_method("spawn", force=True)
+    except Exception:
+        # 既に設定済みなどの理由で失敗した場合でも処理は継続
+        pass
+
     main()

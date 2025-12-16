@@ -115,10 +115,12 @@ const exportSlice = createSlice({
       if (estimatedRemaining !== undefined) state.estimatedRemaining = estimatedRemaining;
     },
     updateBatchProgress: (state, action) => {
-      const { current, total, message } = action.payload;
+      const { current, total, message, elapsedTime, estimatedRemaining } = action.payload;
       if (current !== undefined) state.batchProgress.current = current;
       if (total !== undefined) state.batchProgress.total = total;
       if (message !== undefined) state.currentTask = message;
+      if (elapsedTime !== undefined) state.elapsedTime = elapsedTime;
+      if (estimatedRemaining !== undefined) state.estimatedRemaining = estimatedRemaining;
 
       // 進捗率を計算
       if (state.batchProgress.total > 0) {

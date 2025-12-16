@@ -193,6 +193,10 @@ class CSVHandler:
 
         processor = VideoProcessor()
 
+        # 全体進捗の初期化イベント
+        if progress_callback:
+            progress_callback(0, total_rows, f"CSVを処理中... 0/{total_rows}")
+
         for index, row_info in enumerate(self.csv_data):
             row_number = row_info['row_number']
             row_data = row_info['data']
@@ -201,7 +205,7 @@ class CSVHandler:
             # 全体進捗通知
             if progress_callback:
                 progress_callback(
-                    index + 1,
+                    index,
                     total_rows,
                     f"{video_name}を処理中... ({index + 1}/{total_rows})"
                 )
@@ -237,10 +241,12 @@ class CSVHandler:
                 def video_progress_callback(progress_data: Dict[str, Any]):
                     if progress_callback:
                         percentage = progress_data.get('percentage', 0)
+                        # 動画内の進捗も全体進捗に反映する（小数で伝える）
+                        overall_current = index + min(max(percentage, 0), 100) / 100
                         progress_callback(
-                            index + 1,
+                            overall_current,
                             total_rows,
-                            f"{video_name}をレンダリング中... {percentage:.1f}%"
+                            f"{video_name}をレンダリング中... {percentage:.1f}% ({index + 1}/{total_rows})"
                         )
 
                 # 動画生成
@@ -260,6 +266,12 @@ class CSVHandler:
                     raise Exception("レンダリングが失敗しました")
 
             except Exception as e:
+                if progress_callback:
+                    progress_callback(
+                        index + 1,
+                        total_rows,
+                        f"{video_name}でエラー: {e}"
+                    )
                 error_count += 1
                 error_info = {
                     'row': row_number,

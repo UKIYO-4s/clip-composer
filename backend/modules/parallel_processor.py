@@ -6,7 +6,7 @@ ProcessPoolExecutorを使用してCSVの各行を並列に処理
 import os
 import copy
 from typing import Dict, Any, Optional, List, Callable, Tuple
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed, BrokenProcessPool
 import multiprocessing
 
 
@@ -78,6 +78,12 @@ class ParallelProcessor:
 
         self.max_workers = max_workers
         self._cancel_requested = False
+        try:
+            # macOS配布版でも安定するよう spawn コンテキストを明示
+            self._mp_context = multiprocessing.get_context("spawn")
+        except ValueError:
+            # フォールバック: デフォルトコンテキスト
+            self._mp_context = None
 
     def process_batch_parallel(
         self,
@@ -169,66 +175,88 @@ class ParallelProcessor:
 
         print(f"並列処理開始: {len(jobs)}件のジョブ (ワーカー数: {self.max_workers})")
 
-        # ProcessPoolExecutorで並列処理
-        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
-            # 全ジョブを投入
-            future_to_job = {executor.submit(render_single_video, job): job for job in jobs}
+        completed_rows = set()
+        pool_kwargs = {"max_workers": self.max_workers}
+        if self._mp_context is not None:
+            pool_kwargs["mp_context"] = self._mp_context
 
-            # 完了したジョブを順次処理
-            for future in as_completed(future_to_job):
-                if self._cancel_requested:
-                    executor.shutdown(wait=False, cancel_futures=True)
-                    break
+        try:
+            # ProcessPoolExecutorで並列処理
+            with ProcessPoolExecutor(**pool_kwargs) as executor:
+                # 全ジョブを投入
+                future_to_job = {executor.submit(render_single_video, job): job for job in jobs}
 
-                job = future_to_job[future]
-                row_number = job[0]
-                row_data = job[1]
-                video_name = row_data.get('動画名', '')
+                # 完了したジョブを順次処理
+                for future in as_completed(future_to_job):
+                    if self._cancel_requested:
+                        executor.shutdown(wait=False, cancel_futures=True)
+                        break
 
-                try:
-                    result = future.result()
-                    completed_count += 1
+                    job = future_to_job[future]
+                    row_number = job[0]
+                    row_data = job[1]
+                    video_name = row_data.get('動画名', '')
 
-                    if result['success']:
-                        success_count += 1
-                        if row_callback:
-                            row_callback(row_number, row_data, True, None)
-                        print(f"[{completed_count}/{len(jobs)}] 行{row_number}の動画生成成功: {result['output_path']}")
-                    else:
+                    try:
+                        result = future.result()
+                        completed_count += 1
+                        completed_rows.add(row_number)
+
+                        if result['success']:
+                            success_count += 1
+                            if row_callback:
+                                row_callback(row_number, row_data, True, None)
+                            print(f"[{completed_count}/{len(jobs)}] 行{row_number}の動画生成成功: {result['output_path']}")
+                        else:
+                            error_count += 1
+                            error_info = {
+                                'row': row_number,
+                                'video_name': video_name,
+                                'error': result['error']
+                            }
+                            errors.append(error_info)
+
+                            if row_callback:
+                                row_callback(row_number, row_data, False, result['error'])
+                            print(f"[{completed_count}/{len(jobs)}] 行{row_number}の動画生成エラー: {result['error']}")
+
+                    except Exception as e:
+                        completed_count += 1
+                        completed_rows.add(row_number)
                         error_count += 1
                         error_info = {
                             'row': row_number,
                             'video_name': video_name,
-                            'error': result['error']
+                            'error': str(e)
                         }
                         errors.append(error_info)
 
                         if row_callback:
-                            row_callback(row_number, row_data, False, result['error'])
-                        print(f"[{completed_count}/{len(jobs)}] 行{row_number}の動画生成エラー: {result['error']}")
+                            row_callback(row_number, row_data, False, str(e))
+                        print(f"[{completed_count}/{len(jobs)}] 行{row_number}の動画生成エラー: {e}")
 
-                except Exception as e:
-                    completed_count += 1
-                    error_count += 1
-                    error_info = {
-                        'row': row_number,
-                        'video_name': video_name,
-                        'error': str(e)
-                    }
-                    errors.append(error_info)
-
-                    if row_callback:
-                        row_callback(row_number, row_data, False, str(e))
-                    print(f"[{completed_count}/{len(jobs)}] 行{row_number}の動画生成エラー: {e}")
-
-                # 進捗通知
-                if progress_callback:
-                    percentage = (completed_count / len(jobs) * 100) if len(jobs) > 0 else 0
-                    progress_callback(
-                        completed_count,
-                        len(jobs),
-                        f"処理中... {completed_count}/{len(jobs)} ({percentage:.1f}%)"
-                    )
+                    # 進捗通知
+                    if progress_callback:
+                        percentage = (completed_count / len(jobs) * 100) if len(jobs) > 0 else 0
+                        progress_callback(
+                            completed_count,
+                            len(jobs),
+                            f"処理中... {completed_count}/{len(jobs)} ({percentage:.1f}%)"
+                        )
+        except BrokenProcessPool as e:
+            print(f"並列処理が異常終了しました。逐次処理にフォールバックします: {e}")
+            remaining_jobs = [job for job in jobs if job[0] not in completed_rows]
+            return self._process_jobs_sequential(
+                remaining_jobs,
+                len(jobs),
+                success_count,
+                error_count,
+                errors,
+                completed_rows_count=completed_count,
+                progress_callback=progress_callback,
+                row_callback=row_callback,
+                total_rows=total_rows
+            )
 
         # 結果サマリー
         result_summary = {
@@ -244,6 +272,92 @@ class ParallelProcessor:
         print(f"  成功: {success_count}/{total_rows}")
         print(f"  失敗: {error_count}/{total_rows}")
         print(f"  ワーカー数: {self.max_workers}")
+
+        return result_summary
+
+    def _process_jobs_sequential(
+        self,
+        jobs: List[Tuple],
+        total_jobs: int,
+        success_count: int,
+        error_count: int,
+        errors: List[Dict[str, Any]],
+        completed_rows_count: int = 0,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        row_callback: Optional[Callable[[int, Dict[str, Any], bool, Optional[str]], None]] = None,
+        total_rows: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """並列失敗時のフォールバック用に逐次処理でジョブを処理"""
+        if total_rows is None:
+            total_rows = total_jobs
+
+        completed_count = completed_rows_count
+
+        for job in jobs:
+            if self._cancel_requested:
+                break
+
+            row_number, row_data, timeline_data, output_path, options, overrides = job
+            video_name = row_data.get('動画名', '')
+
+            try:
+                result = render_single_video(job)
+                completed_count += 1
+
+                if result.get('success'):
+                    success_count += 1
+                    if row_callback:
+                        row_callback(row_number, row_data, True, None)
+                    print(f"[{completed_count}/{total_jobs}] (fallback) 行{row_number}の動画生成成功: {result.get('output_path')}")
+                else:
+                    error_count += 1
+                    error_info = {
+                        'row': row_number,
+                        'video_name': video_name,
+                        'error': result.get('error')
+                    }
+                    errors.append(error_info)
+
+                    if row_callback:
+                        row_callback(row_number, row_data, False, result.get('error'))
+                    print(f"[{completed_count}/{total_jobs}] (fallback) 行{row_number}の動画生成エラー: {result.get('error')}")
+
+            except Exception as e:
+                completed_count += 1
+                error_count += 1
+                error_info = {
+                    'row': row_number,
+                    'video_name': video_name,
+                    'error': str(e)
+                }
+                errors.append(error_info)
+
+                if row_callback:
+                    row_callback(row_number, row_data, False, str(e))
+                print(f"[{completed_count}/{total_jobs}] (fallback) 行{row_number}の動画生成エラー: {e}")
+
+            # 進捗通知
+            if progress_callback:
+                percentage = (completed_count / total_jobs * 100) if total_jobs > 0 else 0
+                progress_callback(
+                    completed_count,
+                    total_jobs,
+                    f"逐次処理中... {completed_count}/{total_jobs} ({percentage:.1f}%)"
+                )
+
+        result_summary = {
+            'success_count': success_count,
+            'error_count': error_count,
+            'total_count': total_rows,
+            'errors': errors,
+            'parallel': False,
+            'fallback_from_parallel': True,
+            'workers': 1
+        }
+
+        print(f"\nフォールバック完了:")
+        print(f"  成功: {success_count}/{total_rows}")
+        print(f"  失敗: {error_count}/{total_rows}")
 
         return result_summary
 
