@@ -37,5 +37,13 @@ backend/__pycache__/
 *.tmp
 *.temp
 
+# Backend temporary/test files
+backend/tmp_*
+backend/test_output.mp4
+backend/clip_composer_backend.spec
+
+# Icon build intermediate
+assets/icon.iconset/
+
 *storybook.log
 storybook-static
