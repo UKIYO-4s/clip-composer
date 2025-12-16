@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addClip } from '../../store/timelineSlice';
+import { addClip, saveToHistory } from '../../store/timelineSlice';
 import { addAssets } from '../../store/assetsSlice';
 import {
   Plus,
@@ -115,6 +115,8 @@ const LayerCreationPanel = () => {
 
       let currentFramePos = currentFrame;
       const targetLayer = getTargetLayer(layerType.type);
+
+      dispatch(saveToHistory());
 
       files.forEach((file) => {
         // アセットとして追加

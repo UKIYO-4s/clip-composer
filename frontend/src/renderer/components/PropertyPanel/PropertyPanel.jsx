@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { updateClip } from '../../store/timelineSlice';
+import { updateClip, saveToHistory } from '../../store/timelineSlice';
 import { ChevronDown } from '../Icons';
 import { Input } from '../ui';
 import EffectSection from './EffectSection';
@@ -166,6 +166,9 @@ const PropertyPanel = () => {
     if (Object.keys(updates).length === 0) {
       return;
     }
+
+    // 履歴に保存
+    dispatch(saveToHistory());
 
     // 各選択クリップに対して適用
     selectedClipIds.forEach((clipId) => {
@@ -455,6 +458,7 @@ const PropertyPanel = () => {
 
   // プロパティ更新ハンドラー
   const handleUpdate = (updates) => {
+    dispatch(saveToHistory());
     dispatch(updateClip({ layerId, clipId: clip.id, updates }));
   };
 

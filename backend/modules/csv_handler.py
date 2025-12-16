@@ -328,13 +328,19 @@ class CSVHandler:
                 elif clip_type == 'variable_text':
                     template = clip.get('template', '')
                     variable_values = clip.get('variableValues', {}).copy()
+                    clip_id = clip.get('id', '')
 
                     # CSVからの値で変数を上書き
+                    # クリップID付きキー（varName__clipId）を優先し、なければ従来の変数名で互換性を維持
                     variables = clip.get('variables', [])
                     for var_name in variables:
-                        if var_name in overrides:
+                        per_clip_key = f"{var_name}__{clip_id}"
+                        if per_clip_key in overrides:
+                            variable_values[var_name] = overrides[per_clip_key]
+                            print(f"可変テキスト変数置換(per-clip): {per_clip_key} = {overrides[per_clip_key]}")
+                        elif var_name in overrides:
                             variable_values[var_name] = overrides[var_name]
-                            print(f"可変テキスト変数置換: {var_name} = {overrides[var_name]}")
+                            print(f"可変テキスト変数置換(互換): {var_name} = {overrides[var_name]}")
 
                     clip['variableValues'] = variable_values
 

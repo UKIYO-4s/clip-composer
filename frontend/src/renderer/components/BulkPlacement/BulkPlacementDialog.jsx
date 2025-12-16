@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addClip, updateClip, selectLayerOrder, selectLayers, selectResolution, selectSelectedClipIds } from '../../store/timelineSlice';
+import { addClip, updateClip, selectLayerOrder, selectLayers, selectResolution, selectSelectedClipIds, saveToHistory } from '../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../ui';
 import { X } from '../Icons';
 
@@ -192,6 +192,9 @@ const BulkPlacementDialog = ({ isOpen, onClose }) => {
       finalClips = PRESETS[selectedPreset].apply(newClips, resolution, fps);
     }
 
+    // 履歴に保存
+    dispatch(saveToHistory());
+
     // クリップを追加
     finalClips.forEach(clip => {
       dispatch(addClip({ layerId: targetLayer, clip }));
@@ -221,6 +224,8 @@ const BulkPlacementDialog = ({ isOpen, onClose }) => {
     }
 
     const updatedClips = PRESETS[selectedPreset].apply(randomLayerClips, resolution, fps);
+
+    dispatch(saveToHistory());
 
     updatedClips.forEach((updatedClip, index) => {
       const originalClip = randomLayerClips[index];

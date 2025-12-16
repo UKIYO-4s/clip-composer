@@ -373,6 +373,17 @@ function App() {
     };
   }, [isDirty]);
 
+  // macOSでファイルをダブルクリックで開いた場合
+  useEffect(() => {
+    if (window.api?.project?.onOpenFile) {
+      const unsubscribe = window.api.project.onOpenFile((filePath) => {
+        console.log('Received open-project-file event:', filePath);
+        handleLoadProject(filePath);
+      });
+      return () => unsubscribe();
+    }
+  }, [handleLoadProject]);
+
   // キーボードショートカット
   useEffect(() => {
     const handleKeyDown = (e) => {

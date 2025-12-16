@@ -94,6 +94,13 @@ contextBridge.exposeInMainWorld('api', {
 
     // 自動保存を削除
     deleteAutoSave: (filename) => ipcRenderer.invoke('delete-auto-save', { filename }),
+
+    // ファイルから開くリスナー（macOSでダブルクリックで開いた場合）
+    onOpenFile: (callback) => {
+      const handler = (event, filePath) => callback(filePath);
+      ipcRenderer.on('open-project-file', handler);
+      return () => ipcRenderer.removeListener('open-project-file', handler);
+    },
   },
 
   // テンプレート操作

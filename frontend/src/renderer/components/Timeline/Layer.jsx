@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useDrop } from 'react-dnd';
 import Clip, { ItemTypes } from './Clip';
-import { moveClip, moveClipToLayer, duplicateClipToPosition, moveClipsWithDelta, duplicateClipsWithDelta } from '../../store/timelineSlice';
+import { moveClip, moveClipToLayer, duplicateClipToPosition, moveClipsWithDelta, duplicateClipsWithDelta, saveToHistory } from '../../store/timelineSlice';
 
 function Layer({ layerId, layer, pixelsPerFrame }) {
   const dispatch = useDispatch();
@@ -40,6 +40,7 @@ function Layer({ layerId, layer, pixelsPerFrame }) {
           originalStartFrame: info.startFrame,
         }));
 
+        dispatch(saveToHistory());
         if (isAltPressed) {
           dispatch(duplicateClipsWithDelta({
             clipMoves,
@@ -55,6 +56,7 @@ function Layer({ layerId, layer, pixelsPerFrame }) {
         }
       } else {
         // 単一クリップの処理（既存ロジック）
+        dispatch(saveToHistory());
         if (isAltPressed) {
           dispatch(duplicateClipToPosition({
             fromLayerId: item.layerId,

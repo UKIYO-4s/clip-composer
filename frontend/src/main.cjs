@@ -25,6 +25,9 @@ let licenseStatus = {
   remainingHours: 0,
 };
 
+// ファイルから開く際の保留パス（macOSでダブルクリックで開いた場合）
+let pendingFilePath = null;
+
 // Python プロセス管理
 class PythonBridge {
   constructor() {
@@ -194,11 +197,21 @@ class PythonBridge {
     };
 
     return new Promise((resolve, reject) => {
-      // タイムアウト設定（長時間レンダリング用に長めに）
+      // タイムアウト設定（コマンド別に設定）
+      // render_batch: 6時間（複数動画生成用）
+      // render: 1時間（単発レンダリング用）
+      // その他: 10分
+      let timeoutMs = 600000; // デフォルト10分
+      if (command === 'render_batch') {
+        timeoutMs = 21600000; // 6時間
+      } else if (command === 'render') {
+        timeoutMs = 3600000; // 1時間
+      }
+
       const timeout = setTimeout(() => {
         pendingRequests.delete(id);
         reject(new Error('Request timeout'));
-      }, 600000); // 10分
+      }, timeoutMs);
 
       pendingRequests.set(id, {
         resolve: (data) => {
@@ -295,12 +308,24 @@ function createWindow() {
     backgroundColor: '#1e1e1e',
   });
 
+  // 保留ファイルパスを送信する共通処理
+  const sendPendingFile = () => {
+    if (pendingFilePath && mainWindow && !mainWindow.isDestroyed()) {
+      // 少し遅延させてレンダラーの準備を待つ
+      setTimeout(() => {
+        mainWindow.webContents.send('open-project-file', pendingFilePath);
+        pendingFilePath = null;
+      }, 1000);
+    }
+  };
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
     // 開発環境ではすぐに表示
     mainWindow.once('ready-to-show', () => {
       closeSplashAndShowMain();
+      sendPendingFile();
     });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../build/index.html'));
@@ -309,6 +334,7 @@ function createWindow() {
       // 少し遅延させてスムーズに見せる
       setTimeout(() => {
         closeSplashAndShowMain();
+        sendPendingFile();
       }, 500);
     });
   }
@@ -411,6 +437,23 @@ async function checkLicenseOnStartup() {
     createLicenseWindow();
   }
 }
+
+// macOS: ファイルをダブルクリックで開いた場合のハンドラ
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  console.log('open-file event received:', filePath);
+
+  // .ccprojファイルのみ処理
+  if (filePath.endsWith('.ccproj')) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // ウィンドウが既に存在する場合は直接送信
+      mainWindow.webContents.send('open-project-file', filePath);
+    } else {
+      // ウィンドウがまだない場合は保留
+      pendingFilePath = filePath;
+    }
+  }
+});
 
 app.whenReady().then(() => {
   // スプラッシュ画面を表示（本番環境のみ）
@@ -562,6 +605,37 @@ ipcMain.handle('save-file', async (event, options = {}) => {
   }
 
   return { canceled: false, filePath: result.filePath };
+});
+
+// ファイルを開くダイアログ
+ipcMain.handle('open-file', async (event, options = {}) => {
+  const properties = ['openFile'];
+  if (options.allowMultiple) {
+    properties.push('multiSelections');
+  }
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: properties,
+    filters: options.filters || [{ name: 'CSV Files', extensions: ['csv'] }],
+  });
+
+  return {
+    canceled: result.canceled,
+    filePaths: result.filePaths || [],
+  };
+});
+
+// ディレクトリ選択ダイアログ
+ipcMain.handle('select-directory', async (event, options = {}) => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory', 'createDirectory'],
+    ...options,
+  });
+
+  return {
+    canceled: result.canceled,
+    filePaths: result.filePaths || [],
+  };
 });
 
 // プロジェクト保存ダイアログ

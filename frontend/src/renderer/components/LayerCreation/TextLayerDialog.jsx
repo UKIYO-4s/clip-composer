@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addClip, selectLayerOrder, selectLayers } from '../../store/timelineSlice';
+import { addClip, selectLayerOrder, selectLayers, saveToHistory } from '../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../ui';
 import { X } from '../Icons';
 import { FontSelector, FontStyleControls } from '../FontSelector';
@@ -75,6 +75,7 @@ const TextLayerDialog = ({ isOpen, onClose }) => {
       animation: { type: 'none', duration_frames: 15 },
     };
 
+    dispatch(saveToHistory());
     dispatch(addClip({ layerId: targetLayer, clip: clipData }));
     onClose();
   }, [dispatch, textContent, targetLayer, startFrame, clipDuration, fontSize, fontFamily, textColor, bgColor, fontWeight, isBold, isItalic, strokeWidth, strokeColor, strokePosition, blendMode, letterSpacing, textOpacity, onClose]);

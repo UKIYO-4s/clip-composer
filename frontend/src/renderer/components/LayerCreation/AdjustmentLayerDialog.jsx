@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addClip, selectLayerOrder, selectLayers } from '../../store/timelineSlice';
+import { addClip, selectLayerOrder, selectLayers, saveToHistory } from '../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../ui';
 import { X } from '../Icons';
 
@@ -84,6 +84,7 @@ const AdjustmentLayerDialog = ({ isOpen, onClose }) => {
       vignette,
     };
 
+    dispatch(saveToHistory());
     dispatch(addClip({ layerId: targetLayer, clip: clipData }));
     onClose();
   }, [dispatch, targetLayer, startFrame, clipDuration, selectedPreset, brightness, contrast, saturation, blur, temperature, vignette, onClose]);

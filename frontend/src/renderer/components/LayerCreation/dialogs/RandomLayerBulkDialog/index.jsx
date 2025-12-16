@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addClip, selectLayerOrder, selectLayers } from '../../../../store/timelineSlice';
+import { addClip, selectLayerOrder, selectLayers, saveToHistory, selectResolution } from '../../../../store/timelineSlice';
 import { Button, IconButton, Input, Select } from '../../../ui';
 import { X } from '../../../Icons';
 import InputModeSelector from './InputModeSelector';
@@ -10,6 +10,15 @@ import { useFolderSelection } from '../../../../hooks';
 import { FolderSelector } from '../../../FolderSelector';
 
 const generateId = () => `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// アスペクト比プリセット
+const ASPECT_RATIO_PRESETS = [
+  { id: '16:9', label: '16:9 横', width: 16, height: 9 },
+  { id: '9:16', label: '9:16 縦', width: 9, height: 16 },
+  { id: '4:3', label: '4:3', width: 4, height: 3 },
+  { id: '1:1', label: '1:1 正方形', width: 1, height: 1 },
+  { id: 'custom', label: 'カスタム', width: 16, height: 9 },
+];
 
 // プレビュー色のパレット
 const PREVIEW_COLORS = [
@@ -41,6 +50,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   const layers = useSelector(selectLayers);
   const currentFrame = useSelector((state) => state.timeline.currentFrame);
   const fps = useSelector((state) => state.timeline.fps);
+  const resolution = useSelector(selectResolution);
 
   // ビデオレイヤーのみ抽出（useEffectより先に定義）
   const layerOptions = useMemo(() =>
@@ -78,6 +88,16 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   // エラーメッセージ
   const [errorMessage, setErrorMessage] = useState('');
 
+  // 位置・スケール設定
+  const [positionX, setPositionX] = useState(0);
+  const [positionY, setPositionY] = useState(0);
+  const [scale, setScale] = useState(100);
+
+  // アスペクト比プレビュー設定
+  const [aspectRatioPreset, setAspectRatioPreset] = useState('16:9');
+  const [customAspectWidth, setCustomAspectWidth] = useState(16);
+  const [customAspectHeight, setCustomAspectHeight] = useState(9);
+
   // 素材タイプに応じた拡張子リスト
   const currentExtensions = useMemo(
     () => getExtensionsForMediaType(mediaType, includeGif),
@@ -114,6 +134,12 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
       setPlacementMode('continuous');
       setGapFrames(0);
       setErrorMessage('');
+      setPositionX(0);
+      setPositionY(0);
+      setScale(100);
+      setAspectRatioPreset('16:9');
+      setCustomAspectWidth(16);
+      setCustomAspectHeight(9);
       const firstVideoLayer = layerOptions[0]?.value || 'V1';
       setTargetLayer(firstVideoLayer);
       // フォルダパスをリセット
@@ -166,6 +192,49 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
       totalSeconds: (totalFrames / fps).toFixed(2),
     };
   }, [calculateStartFrame, calculated, placementMode, gapFrames, fps]);
+
+  // 現在のアスペクト比を取得
+  const currentAspectRatio = useMemo(() => {
+    if (aspectRatioPreset === 'custom') {
+      return { width: customAspectWidth || 16, height: customAspectHeight || 9 };
+    }
+    const preset = ASPECT_RATIO_PRESETS.find(p => p.id === aspectRatioPreset);
+    return { width: preset?.width || 16, height: preset?.height || 9 };
+  }, [aspectRatioPreset, customAspectWidth, customAspectHeight]);
+
+  // ビジュアルプレビューの計算
+  const visualPreview = useMemo(() => {
+    const canvasW = resolution?.width || 1080;
+    const canvasH = resolution?.height || 1920;
+    const aspectW = currentAspectRatio.width;
+    const aspectH = currentAspectRatio.height;
+    const scaleVal = scale / 100;
+
+    // 素材のベースサイズ（キャンバス幅に合わせる想定）
+    let videoW = canvasW;
+    let videoH = (canvasW / aspectW) * aspectH;
+
+    // スケール適用
+    videoW *= scaleVal;
+    videoH *= scaleVal;
+
+    // 位置計算（0,0がキャンバス中央）
+    const videoCenterX = canvasW / 2 + positionX;
+    const videoCenterY = canvasH / 2 + positionY;
+    const videoLeft = videoCenterX - videoW / 2;
+    const videoTop = videoCenterY - videoH / 2;
+
+    return {
+      canvasW,
+      canvasH,
+      videoW,
+      videoH,
+      videoLeft,
+      videoTop,
+      videoCenterX,
+      videoCenterY,
+    };
+  }, [resolution, currentAspectRatio, scale, positionX, positionY]);
 
   // バリデーション: 画像の最小フレーム数チェック
   const MIN_IMAGE_FRAMES = 6; // 0.2秒 @ 30fps
@@ -222,6 +291,9 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     // エラーをクリア
     setErrorMessage('');
 
+    // 履歴に保存
+    dispatch(saveToHistory());
+
     let currentFramePos = calculateStartFrame();
     const gap = placementMode === 'continuous' ? 0 : gapFrames;
 
@@ -237,6 +309,10 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
         startFrame: currentFramePos,
         durationFrames: calculated.clipDurationFrames,
         opacity: 100,
+        // 位置・スケール（scaleはパーセント値のまま保存、レンダラーが100で割る）
+        positionX: positionX,
+        positionY: positionY,
+        scale: scale,
         folderPath: folderPath,
         selectionMode: selectionMode,
         // 素材タイプ関連（新規）
@@ -255,7 +331,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     }
 
     onClose();
-  }, [dispatch, calculateStartFrame, calculated, placementMode, gapFrames, targetLayer, folderPath, selectionMode, mediaType, includeGif, currentExtensions, onClose, validateInputs]);
+  }, [dispatch, calculateStartFrame, calculated, placementMode, gapFrames, targetLayer, folderPath, selectionMode, mediaType, includeGif, currentExtensions, positionX, positionY, scale, onClose, validateInputs]);
 
   if (!isOpen) return null;
 
@@ -428,22 +504,193 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
             )}
           </div>
 
-          {/* プレビュー情報 */}
-          <div className="p-3 bg-surface-sunken rounded border border-line">
-            <h3 className="text-sm font-medium text-ink-secondary mb-2">配置プレビュー</h3>
-            <div className="text-xs text-ink-muted space-y-1">
-              <div>素材タイプ: {mediaType === 'video_only' ? '動画のみ' : mediaType === 'image_only' ? '画像のみ' : '両方'}</div>
-              <div>総クリップ数: {calculated.clipCount}</div>
-              <div>各クリップ: {calculated.clipDurationFrames}フレーム ({calculated.clipDurationSeconds.toFixed(2)}秒)</div>
-              <div>配置範囲: {previewInfo.startFrame}〜{previewInfo.endFrame}フレーム</div>
-              <div>総時間: {previewInfo.totalSeconds}秒</div>
-            </div>
-            {/* バリデーション警告 */}
-            {validationWarning && (
-              <div className="mt-2 text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">
-                {validationWarning}
+          {/* 配置シミュレーション */}
+          <div className="space-y-3">
+            <label className="text-xs font-medium text-ink-secondary">配置シミュレーション</label>
+
+            {/* アスペクト比プリセット */}
+            <div className="space-y-2">
+              <label className="text-xs text-ink-muted">素材のアスペクト比（仮）</label>
+              <div className="flex flex-wrap gap-2">
+                {ASPECT_RATIO_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => setAspectRatioPreset(preset.id)}
+                    className={`px-3 py-1.5 text-xs rounded border transition-colors ${
+                      aspectRatioPreset === preset.id
+                        ? 'bg-accent-blue text-white border-accent-blue'
+                        : 'bg-surface-base border-line text-ink-primary hover:bg-state-hover'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
               </div>
-            )}
+              {aspectRatioPreset === 'custom' && (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={customAspectWidth}
+                    onChange={(e) => setCustomAspectWidth(Math.max(1, parseInt(e.target.value) || 16))}
+                    min={1}
+                    className="w-16"
+                  />
+                  <span className="text-ink-muted">:</span>
+                  <Input
+                    type="number"
+                    value={customAspectHeight}
+                    onChange={(e) => setCustomAspectHeight(Math.max(1, parseInt(e.target.value) || 9))}
+                    min={1}
+                    className="w-16"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* 配置プリセット */}
+            <div className="space-y-2">
+              <label className="text-xs text-ink-muted">配置プリセット</label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => { setPositionX(0); setPositionY(0); setScale(100); }}
+                  className="px-2 py-1 text-xs rounded border border-line bg-surface-base hover:bg-state-hover text-ink-primary"
+                >
+                  中央
+                </button>
+                <button
+                  onClick={() => {
+                    const canvasH = resolution?.height || 1920;
+                    setPositionX(0);
+                    setPositionY(-Math.round(canvasH / 3));
+                    setScale(100);
+                  }}
+                  className="px-2 py-1 text-xs rounded border border-line bg-surface-base hover:bg-state-hover text-ink-primary"
+                >
+                  上1/3
+                </button>
+                <button
+                  onClick={() => {
+                    const canvasH = resolution?.height || 1920;
+                    setPositionX(0);
+                    setPositionY(Math.round(canvasH / 3));
+                    setScale(100);
+                  }}
+                  className="px-2 py-1 text-xs rounded border border-line bg-surface-base hover:bg-state-hover text-ink-primary"
+                >
+                  下1/3
+                </button>
+                <button
+                  onClick={() => { setPositionX(0); setPositionY(0); setScale(50); }}
+                  className="px-2 py-1 text-xs rounded border border-line bg-surface-base hover:bg-state-hover text-ink-primary"
+                >
+                  中央50%
+                </button>
+                <button
+                  onClick={() => { setPositionX(0); setPositionY(0); setScale(33); }}
+                  className="px-2 py-1 text-xs rounded border border-line bg-surface-base hover:bg-state-hover text-ink-primary"
+                >
+                  中央33%
+                </button>
+              </div>
+            </div>
+
+            {/* 位置・スケール入力 */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-ink-muted">X座標</label>
+                <Input
+                  type="number"
+                  value={positionX}
+                  onChange={(e) => setPositionX(parseInt(e.target.value) || 0)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-ink-muted">Y座標</label>
+                <Input
+                  type="number"
+                  value={positionY}
+                  onChange={(e) => setPositionY(parseInt(e.target.value) || 0)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-ink-muted">スケール</label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    value={scale}
+                    onChange={(e) => setScale(Math.max(1, parseInt(e.target.value) || 100))}
+                    min={1}
+                    max={500}
+                    placeholder="100"
+                  />
+                  <span className="text-xs text-ink-muted">%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ビジュアルプレビュー */}
+            <div className="p-3 bg-surface-sunken rounded border border-line">
+              <div className="flex gap-4">
+                {/* キャンバスプレビュー */}
+                <div
+                  className="relative bg-black border border-line flex-shrink-0"
+                  style={{
+                    width: 120,
+                    height: 120 * (visualPreview.canvasH / visualPreview.canvasW),
+                  }}
+                >
+                  {/* ガイドライン（中央） */}
+                  <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white/20" />
+                  <div className="absolute top-1/2 left-0 right-0 h-px bg-white/20" />
+
+                  {/* 素材プレビュー */}
+                  <div
+                    className="absolute bg-accent-blue/60 border-2 border-accent-blue"
+                    style={{
+                      width: `${(visualPreview.videoW / visualPreview.canvasW) * 100}%`,
+                      height: `${(visualPreview.videoH / visualPreview.canvasH) * 100}%`,
+                      left: `${(visualPreview.videoLeft / visualPreview.canvasW) * 100}%`,
+                      top: `${(visualPreview.videoTop / visualPreview.canvasH) * 100}%`,
+                    }}
+                  >
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[8px] text-white font-medium">
+                        {currentAspectRatio.width}:{currentAspectRatio.height}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* キャンバスサイズ表示 */}
+                  <div className="absolute bottom-0.5 right-0.5 text-[8px] text-white/50">
+                    {visualPreview.canvasW}x{visualPreview.canvasH}
+                  </div>
+                </div>
+
+                {/* 情報 */}
+                <div className="text-xs text-ink-muted space-y-1 flex-1">
+                  <div className="font-medium text-ink-secondary mb-2">配置情報</div>
+                  <div>キャンバス: {visualPreview.canvasW} x {visualPreview.canvasH}</div>
+                  <div>素材サイズ: {Math.round(visualPreview.videoW)} x {Math.round(visualPreview.videoH)}</div>
+                  <div>位置: ({positionX}, {positionY})</div>
+                  <div>スケール: {scale}%</div>
+                  <div className="pt-2 border-t border-line mt-2">
+                    <div>総クリップ数: {calculated.clipCount}</div>
+                    <div>総時間: {previewInfo.totalSeconds}秒</div>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[10px] text-ink-muted mt-2">
+                ※ X/Y: 0が中央。正の値で右/下、負の値で左/上に移動
+              </p>
+              {/* バリデーション警告 */}
+              {validationWarning && (
+                <div className="mt-2 text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">
+                  {validationWarning}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

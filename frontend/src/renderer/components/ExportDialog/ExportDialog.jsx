@@ -35,8 +35,11 @@ const escapeCsvValue = (value) => {
 };
 
 // タイムラインから可変要素を抽出してCSVカラムを生成
+// 可変テキストはクリップごと（clip.id）に別カラムを生成
 const extractCsvColumns = (timeline) => {
-  const columns = new Set(['動画名']); // 必須カラム
+  const columns = ['動画名']; // 必須カラム（順序を保持するため配列で管理）
+  const columnSet = new Set(['動画名']);
+  let variableTextIndex = 0; // 可変テキストのインデックス（1始まり）
 
   const { layers } = timeline;
 
@@ -44,24 +47,37 @@ const extractCsvColumns = (timeline) => {
     layer.clips.forEach((clip) => {
       // CSVテキストプレースホルダー
       if (clip.type === 'csv_text_placeholder' && clip.csvColumnName) {
-        columns.add(clip.csvColumnName);
+        if (!columnSet.has(clip.csvColumnName)) {
+          columnSet.add(clip.csvColumnName);
+          columns.push(clip.csvColumnName);
+        }
       }
 
-      // 可変テキスト（テンプレート内の変数）
-      if (clip.type === 'variable_text' && clip.variables) {
+      // 可変テキスト（クリップごとに別カラムを生成）
+      if (clip.type === 'variable_text' && clip.variables && clip.id) {
+        variableTextIndex++;
         clip.variables.forEach((varName) => {
-          columns.add(varName);
+          // クリップID付きのカラムキー（例: 名前__clip123）
+          const columnKey = `${varName}__${clip.id}`;
+          if (!columnSet.has(columnKey)) {
+            columnSet.add(columnKey);
+            // メタデータ付きで追加（サンプル行生成用）
+            columns.push({ key: columnKey, varName, clipId: clip.id, index: variableTextIndex });
+          }
         });
       }
 
       // ランダムレイヤー
       if (clip.type === 'random_layer' && clip.randomColumnName) {
-        columns.add(clip.randomColumnName);
+        if (!columnSet.has(clip.randomColumnName)) {
+          columnSet.add(clip.randomColumnName);
+          columns.push(clip.randomColumnName);
+        }
       }
     });
   });
 
-  return Array.from(columns);
+  return columns;
 };
 
 function ExportDialog() {
@@ -156,12 +172,21 @@ function ExportDialog() {
         return;
       }
 
+      // カラムキーを取得（オブジェクトの場合は.keyを使用）
+      const getColumnKey = (col) => (typeof col === 'object' ? col.key : col);
+
       // CSVヘッダー行を生成（エスケープ処理付き）
-      const headerRow = csvColumns.map(escapeCsvValue).join(',');
-      // サンプル行を生成
+      const headerRow = csvColumns.map((col) => escapeCsvValue(getColumnKey(col))).join(',');
+
+      // サンプル行を生成（括弧なしのプレーン値）
       const sampleRow = csvColumns.map((col) => {
         if (col === '動画名') return escapeCsvValue('video_001');
-        return escapeCsvValue(`[${col}の値]`);
+        // 可変テキストのクリップ別カラム（オブジェクト）
+        if (typeof col === 'object') {
+          return escapeCsvValue(`var${col.index}_${col.varName}`);
+        }
+        // csv_text_placeholder / random_layer などその他のカラム
+        return escapeCsvValue(`sample_${col}`);
       }).join(',');
 
       // BOM付きUTF-8でExcelでの文字化けを防ぐ
@@ -171,8 +196,11 @@ function ExportDialog() {
       // ファイルに書き込み（Electron API経由）
       const writeResult = await window.api.fs.writeTextFile(result.filePath, csvContent);
 
+      // 表示用のカラム名リスト
+      const columnNames = csvColumns.map(getColumnKey);
+
       if (writeResult.success) {
-        alert(`CSVテンプレートを保存しました:\n${result.filePath}\n\nカラム: ${csvColumns.join(', ')}`);
+        alert(`CSVテンプレートを保存しました:\n${result.filePath}\n\nカラム: ${columnNames.join(', ')}`);
       } else {
         alert('CSVテンプレートの保存に失敗しました');
       }
@@ -552,21 +580,25 @@ function ExportDialog() {
                         variant="subtle"
                         size="sm"
                         onClick={handleExportTemplate}
-                        disabled={csvColumns.length <= 1}
                       >
                         テンプレート出力
                       </Button>
                     </div>
                     {csvColumns.length > 1 ? (
                       <div className="flex flex-wrap gap-1">
-                        {csvColumns.map((col) => (
-                          <span
-                            key={col}
-                            className="px-2 py-0.5 text-xs rounded bg-accent-blue/20 text-accent-blue"
-                          >
-                            {col}
-                          </span>
-                        ))}
+                        {csvColumns.map((col) => {
+                          const colKey = typeof col === 'object' ? col.key : col;
+                          const displayName = typeof col === 'object' ? `${col.index}.${col.varName}` : col;
+                          return (
+                            <span
+                              key={colKey}
+                              className="px-2 py-0.5 text-xs rounded bg-accent-blue/20 text-accent-blue"
+                              title={colKey}
+                            >
+                              {displayName}
+                            </span>
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="text-xs text-ink-muted">

@@ -714,6 +714,45 @@ const timelineSlice = createSlice({
         destLayer.clips = currentClips;
       });
     },
+    // 選択クリップを別レイヤーに一括移動
+    moveSelectedClipsToLayer: (state, action) => {
+      const { targetLayerId } = action.payload;
+      const targetLayer = state.layers[targetLayerId];
+      if (!targetLayer) return;
+
+      // 選択されたクリップを収集
+      const clipsToMove = [];
+      Object.values(state.layers).forEach(layer => {
+        layer.clips.forEach(clip => {
+          if (state.selectedClipIds.includes(clip.id)) {
+            clipsToMove.push({
+              clip: { ...clip },
+              fromLayerId: layer.id,
+            });
+          }
+        });
+      });
+
+      if (clipsToMove.length === 0) return;
+
+      // 移動元から削除
+      clipsToMove.forEach(({ clip, fromLayerId }) => {
+        const fromLayer = state.layers[fromLayerId];
+        fromLayer.clips = fromLayer.clips.filter(c => c.id !== clip.id);
+      });
+
+      // 移動先に追加（重複処理付き）
+      let currentClips = [...targetLayer.clips];
+      clipsToMove.forEach(({ clip }) => {
+        // 重複処理
+        currentClips = handleClipOverlap(currentClips, clip);
+        // クリップを追加
+        currentClips.push(clip);
+      });
+
+      // レイヤーを更新
+      targetLayer.clips = currentClips;
+    },
     // 再生コントロール
     setIsPlaying: (state, action) => {
       state.isPlaying = action.payload;
@@ -745,9 +784,9 @@ const timelineSlice = createSlice({
     },
     // Undo
     undo: (state) => {
-      if (state.historyIndex > 0) {
-        state.historyIndex--;
+      if (state.historyIndex >= 0 && state.history.length > 0) {
         restoreSnapshot(state, state.history[state.historyIndex]);
+        state.historyIndex--;
         state.selectedClipIds = [];
       }
     },
@@ -878,6 +917,7 @@ export const {
   moveClipToLayer,
   moveClipsWithDelta,
   duplicateClipsWithDelta,
+  moveSelectedClipsToLayer,
   setIsPlaying,
   setLoopEnabled,
   setPlaybackRate,
@@ -902,7 +942,7 @@ export const selectIsPlaying = (state) => state.timeline.isPlaying;
 export const selectLoopEnabled = (state) => state.timeline.loopEnabled;
 export const selectLayers = (state) => state.timeline.layers;
 export const selectLayerOrder = (state) => state.timeline.layerOrder;
-export const selectCanUndo = (state) => state.timeline.historyIndex > 0;
+export const selectCanUndo = (state) => state.timeline.historyIndex >= 0 && state.timeline.history.length > 0;
 export const selectCanRedo = (state) => state.timeline.historyIndex < state.timeline.history.length - 1;
 export const selectClipboardLength = (state) => state.timeline.clipboard.length;
 export const selectPixelsPerFrame = (state) => state.timeline.pixelsPerFrame;

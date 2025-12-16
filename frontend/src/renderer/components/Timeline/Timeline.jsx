@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setCurrentFrame, addClip, clearSelection, addVideoLayer, addSoundLayer, removeLayer, removeClips, setPixelsPerFrame } from '../../store/timelineSlice';
+import { setCurrentFrame, addClip, clearSelection, addVideoLayer, addSoundLayer, removeLayer, removeClips, setPixelsPerFrame, saveToHistory, moveSelectedClipsToLayer } from '../../store/timelineSlice';
 import Layer from './Layer';
 import TransportControls from '../Controls/TransportControls';
 import MarqueeSelection from './MarqueeSelection';
@@ -96,6 +96,38 @@ function Timeline() {
     dispatch(removeLayer({ layerId }));
   }, [dispatch]);
 
+  // 選択クリップを別レイヤーに移動
+  const handleMoveToLayer = useCallback((targetLayerId) => {
+    if (selectedClipIds.length === 0) return;
+    dispatch(saveToHistory());
+    dispatch(moveSelectedClipsToLayer({ targetLayerId }));
+  }, [dispatch, selectedClipIds]);
+
+  // 選択されたクリップがあるかどうか
+  const hasSelectedClips = selectedClipIds.length > 0;
+
+  // 選択中のクリップがあるレイヤータイプを取得（VideoかSoundか）
+  const selectedClipLayerType = useMemo(() => {
+    if (selectedClipIds.length === 0) return null;
+    for (const layerId of Object.keys(layers)) {
+      const layer = layers[layerId];
+      for (const clip of layer.clips) {
+        if (selectedClipIds.includes(clip.id)) {
+          return layer.type;
+        }
+      }
+    }
+    return null;
+  }, [selectedClipIds, layers]);
+
+  // 移動可能なレイヤーリスト（同タイプのレイヤーのみ）
+  const availableTargetLayers = useMemo(() => {
+    if (!selectedClipLayerType) return [];
+    return layerOrder
+      .filter(id => layers[id].type === selectedClipLayerType)
+      .map(id => ({ id, name: layers[id].name }));
+  }, [selectedClipLayerType, layerOrder, layers]);
+
   // 外部ファイルドロップハンドラー（React DnDとの競合回避）
   const handleDragOver = useCallback((e) => {
     // 外部ファイルドラッグの場合のみ処理（React DnDはスルー）
@@ -132,6 +164,9 @@ function Timeline() {
       const x = e.clientX - rect.left - 80; // 80px はラベルエリア
       dropFrame = Math.max(0, Math.round(x / pixelsPerFrame));
     }
+
+    // 履歴に保存
+    dispatch(saveToHistory());
 
     // 各ファイルをクリップとして追加
     files.forEach((file, index) => {
@@ -311,6 +346,7 @@ function Timeline() {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
         e.preventDefault();
+        dispatch(saveToHistory());
         dispatch(removeClips({ clipIds: selectedClipIds }));
       }
     };
@@ -448,6 +484,28 @@ function Timeline() {
         <div className="ml-4 text-xs text-ink-secondary">
           フレーム: {currentFrame} / {totalFrames}
         </div>
+
+        {/* 選択クリップのレイヤー移動UI */}
+        {hasSelectedClips && availableTargetLayers.length > 1 && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-ink-secondary">
+              {selectedClipIds.length}個選択中
+            </span>
+            <span className="text-xs text-ink-muted">→</span>
+            <select
+              className="px-2 py-0.5 text-xs bg-surface-sunken border border-line rounded text-ink-primary focus:outline-none focus:border-accent-blue"
+              onChange={(e) => handleMoveToLayer(e.target.value)}
+              value=""
+            >
+              <option value="" disabled>レイヤーに移動...</option>
+              {availableTargetLayers.map(layer => (
+                <option key={layer.id} value={layer.id}>
+                  {layer.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* タイムコードジャンプダイアログ */}

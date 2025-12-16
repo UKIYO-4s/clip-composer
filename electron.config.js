@@ -46,6 +46,27 @@ export default {
         arch: ['x64', 'arm64'], // Intel Mac + Apple Silicon両対応
       },
     ],
+    extendInfo: {
+      CFBundleDocumentTypes: [
+        {
+          CFBundleTypeExtensions: ['ccproj'],
+          CFBundleTypeName: 'Clip Composer Project',
+          CFBundleTypeRole: 'Editor',
+          LSItemContentTypes: ['com.clipcomposer.project'],
+          LSHandlerRank: 'Owner',
+        },
+      ],
+      UTExportedTypeDeclarations: [
+        {
+          UTTypeIdentifier: 'com.clipcomposer.project',
+          UTTypeDescription: 'Clip Composer Project',
+          UTTypeConformsTo: ['public.json', 'public.data'],
+          UTTypeTagSpecification: {
+            'public.filename-extension': ['ccproj'],
+          },
+        },
+      ],
+    },
   },
   dmg: {
     sign: false,
