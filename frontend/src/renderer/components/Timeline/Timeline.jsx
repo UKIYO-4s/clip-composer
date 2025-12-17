@@ -118,13 +118,24 @@ function Timeline() {
 
   // スナップ境界を収集（メモ化）- ドラッグ中のクリップは除外
   const snapBoundaries = useMemo(() => {
-    const boundaries = new Set();
+    const boundaryMap = new Map();
+
+    const ensureBoundary = (frame) => {
+      if (!boundaryMap.has(frame)) {
+        boundaryMap.set(frame, { frame, sources: [] });
+      }
+      return boundaryMap.get(frame);
+    };
 
     // フレーム0を常に追加
-    boundaries.add(0);
+    ensureBoundary(0);
 
     // 現在の再生ヘッド位置を追加
-    boundaries.add(currentFrame);
+    const playheadBoundary = ensureBoundary(currentFrame);
+    playheadBoundary.sources.push({
+      kind: 'playhead',
+      label: '再生ヘッド',
+    });
 
     // すべてのレイヤーのクリップ境界を収集（選択中のクリップは除外）
     layerOrder.forEach((layerId) => {
@@ -136,15 +147,37 @@ function Timeline() {
         if (selectedClipIds.includes(clip.id)) {
           return;
         }
+
+        const layerName = layers[layerId]?.name || layerId;
+
         // クリップの開始フレーム
-        boundaries.add(clip.startFrame);
+        const startBoundary = ensureBoundary(clip.startFrame);
+        startBoundary.sources.push({
+          kind: 'clip',
+          clipId: clip.id,
+          clipName: clip.name,
+          layerId,
+          layerName,
+          edge: 'start',
+          type: clip.type,
+        });
+
         // クリップの終了フレーム
-        boundaries.add(clip.startFrame + clip.durationFrames);
+        const endBoundary = ensureBoundary(clip.startFrame + clip.durationFrames);
+        endBoundary.sources.push({
+          kind: 'clip',
+          clipId: clip.id,
+          clipName: clip.name,
+          layerId,
+          layerName,
+          edge: 'end',
+          type: clip.type,
+        });
       });
     });
 
     // ソートされた配列に変換
-    return Array.from(boundaries).sort((a, b) => a - b);
+    return Array.from(boundaryMap.values()).sort((a, b) => a.frame - b.frame);
   }, [layers, layerOrder, currentFrame, selectedClipIds]);
 
   // ピクセル閾値をフレーム数に変換
@@ -153,8 +186,8 @@ function Timeline() {
   }, [pixelsPerFrame]);
 
   // スナップガイド表示ハンドラー
-  const handleSnapGuideShow = useCallback((position) => {
-    setActiveSnapGuide(position);
+  const handleSnapGuideShow = useCallback((guideInfo) => {
+    setActiveSnapGuide(guideInfo);
   }, []);
 
   // スナップガイド非表示ハンドラー
@@ -388,15 +421,23 @@ function Timeline() {
     }
   }, [showTimecodeDialog]);
 
+  // clientXからフレーム位置を計算
+  const computeFrameFromClientX = useCallback((clientX, rect, scrollLeftValue = 0) => {
+    if (!rect) return null;
+    const x = clientX - rect.left + scrollLeftValue;
+    return Math.max(0, Math.min(Math.floor(x / pixelsPerFrame), totalFrames));
+  }, [pixelsPerFrame, totalFrames]);
+
   // 再生位置更新（ルーラー専用）
   const updatePlayheadPosition = useCallback((e) => {
     if (!rulerRef.current || !timelineRef.current) return;
     const rect = rulerRef.current.getBoundingClientRect();
     const scrollLeft = timelineRef.current.scrollLeft || 0;
-    const x = e.clientX - rect.left + scrollLeft;
-    const frame = Math.max(0, Math.min(Math.floor(x / pixelsPerFrame), totalFrames));
-    dispatch(setCurrentFrame(frame));
-  }, [dispatch, pixelsPerFrame, totalFrames]);
+    const frame = computeFrameFromClientX(e.clientX, rect, scrollLeft);
+    if (frame !== null) {
+      dispatch(setCurrentFrame(frame));
+    }
+  }, [dispatch, computeFrameFromClientX]);
 
   // ルーラーのマウスダウン
   const handleRulerMouseDown = useCallback((e) => {
@@ -433,23 +474,36 @@ function Timeline() {
   // グローバルAltキー状態追跡（Option+ドラッグ複製用）
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Alt') {
+      if (e.altKey || e.key === 'Alt' || e.key === 'AltGraph' || e.code === 'AltLeft' || e.code === 'AltRight') {
         window.__isAltPressed = true;
       }
     };
 
     const handleKeyUp = (e) => {
-      if (e.key === 'Alt') {
+      if (!e.altKey && (e.key === 'Alt' || e.key === 'AltGraph' || e.code === 'AltLeft' || e.code === 'AltRight')) {
         window.__isAltPressed = false;
       }
     };
 
+    const handleBlur = () => {
+      window.__isAltPressed = false;
+    };
+
+    const handleMouseDown = (e) => {
+      if (!e.altKey) return;
+      window.__isAltPressed = true;
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('mousedown', handleMouseDown);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('mousedown', handleMouseDown);
       window.__isAltPressed = false;
     };
   }, []);
@@ -564,14 +618,23 @@ function Timeline() {
     }
   }, [isResizing, handleResizeMove, handleResizeEnd]);
 
-  // 背景クリックで選択解除
+  // 背景クリックで選択解除＆再生ヘッドジャンプ
   const handleBackgroundClick = useCallback((e) => {
     // クリップやルーラー上のクリックは無視
     if (e.target.closest('[data-clip]') || e.target.closest('[data-ruler]')) return;
     // マーキー選択直後は選択解除をスキップ
     if (window.__justFinishedMarquee) return;
+
+    // 再生ヘッドをクリック位置へ移動
+    const rect = timelineRef.current?.getBoundingClientRect();
+    const scrollLeft = timelineRef.current?.scrollLeft || 0;
+    const frame = computeFrameFromClientX(e.clientX, rect, scrollLeft);
+    if (frame !== null) {
+      dispatch(setCurrentFrame(frame));
+    }
+
     dispatch(clearSelection());
-  }, [dispatch]);
+  }, [dispatch, computeFrameFromClientX]);
 
   // タイムルーラーの描画
   const renderTimeRuler = () => {
@@ -761,7 +824,7 @@ function Timeline() {
         {/* タイムラインスクロールエリア */}
         <div
           ref={timelineRef}
-          className="flex-1 overflow-x-auto overflow-y-hidden"
+          className="flex-1 overflow-x-auto overflow-y-auto"
           onClick={handleBackgroundClick}
         >
           <div
@@ -822,7 +885,8 @@ function Timeline() {
 
             {/* スナップガイド */}
             <SnapGuide
-              snapPosition={activeSnapGuide}
+              snapPosition={activeSnapGuide?.position ?? null}
+              snapSources={activeSnapGuide?.sources ?? []}
               pixelsPerFrame={pixelsPerFrame}
               visible={activeSnapGuide !== null}
             />

@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useDispatch, useSelector, shallowEqual } from 'react-redux';
 import { useDrag } from 'react-dnd';
-import { selectClip, toggleClipSelection, resizeClipStart, resizeClipEnd, selectFps } from '../../store/timelineSlice';
+import { selectClip, toggleClipSelection, resizeClipStart, resizeClipEnd, selectFps, selectSelectedClipIds, selectLayers } from '../../store/timelineSlice';
 
 // ドラッグ&ドロップ用アイテムタイプ
 export const ItemTypes = {
@@ -11,13 +11,14 @@ export const ItemTypes = {
 /**
  * Clip - タイムライン上のクリップコンポーネント
  * クリップタイプごとに色分けして表示
+ * React.memoでメモ化して不要な再レンダーを防止
  */
-const Clip = ({ clip, layerId, pixelsPerFrame }) => {
+const Clip = memo(({ clip, layerId, pixelsPerFrame, isSelected }) => {
   const dispatch = useDispatch();
-  const selectedClipIds = useSelector((state) => state.timeline.selectedClipIds);
-  const layers = useSelector((state) => state.timeline.layers);
+  // useSelectorを分割して必要最小限のみ取得（shallowEqual使用）
+  const selectedClipIds = useSelector(selectSelectedClipIds, shallowEqual);
+  const layers = useSelector(selectLayers, shallowEqual);
   const fps = useSelector(selectFps);
-  const isSelected = selectedClipIds.includes(clip.id);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeType, setResizeType] = useState(null); // 'start' or 'end'
   const resizeDataRef = useRef({});
@@ -229,6 +230,6 @@ const Clip = ({ clip, layerId, pixelsPerFrame }) => {
       />
     </div>
   );
-};
+});
 
 export default Clip;

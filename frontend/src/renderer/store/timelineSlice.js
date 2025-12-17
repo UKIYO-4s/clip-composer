@@ -948,6 +948,7 @@ export const selectClipboardLength = (state) => state.timeline.clipboard.length;
 export const selectPixelsPerFrame = (state) => state.timeline.pixelsPerFrame;
 export const selectMinPixelsPerFrame = (state) => state.timeline.minPixelsPerFrame;
 export const selectMaxPixelsPerFrame = (state) => state.timeline.maxPixelsPerFrame;
+export const selectSelectedClipIds = (state) => state.timeline.selectedClipIds;
 
 // 現在フレームで表示すべきクリップを取得するセレクター（メモ化版）
 export const selectVisibleClips = createSelector(

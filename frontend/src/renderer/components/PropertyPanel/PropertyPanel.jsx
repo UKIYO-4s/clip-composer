@@ -518,9 +518,9 @@ const PropertyPanel = () => {
                   disabled={!bulkProperties.fit.enabled}
                   className="flex-1 px-2 py-1 text-sm bg-surface-sunken border border-line rounded focus:outline-none focus:border-accent-blue text-ink-primary disabled:opacity-50"
                 >
-                  <option value="contain">Contain</option>
-                  <option value="cover">Cover</option>
-                  <option value="none">None</option>
+                  <option value="contain">フィット（全体表示）</option>
+                  <option value="cover">カバー（画面いっぱい）</option>
+                  <option value="none">なし（元サイズ）</option>
                 </select>
               </div>
 
@@ -585,10 +585,10 @@ const PropertyPanel = () => {
                       }
                       className="flex-1 px-2 py-1 text-sm bg-surface-sunken border border-line rounded focus:outline-none focus:border-accent-blue text-ink-primary"
                     >
-                      <option value="linear">Linear</option>
-                      <option value="ease_in">Ease In</option>
-                      <option value="ease_out">Ease Out</option>
-                      <option value="ease_in_out">Ease In Out</option>
+                      <option value="linear">リニア</option>
+                      <option value="ease_in">イーズイン</option>
+                      <option value="ease_out">イーズアウト</option>
+                      <option value="ease_in_out">イーズインアウト</option>
                     </select>
                   </div>
                 )}
@@ -714,9 +714,9 @@ const PropertyPanel = () => {
               onChange={(e) => handleUpdate({ fit: e.target.value })}
               className="w-full px-2 py-1 text-sm bg-surface-sunken border border-line rounded focus:outline-none focus:border-accent-blue text-ink-primary"
             >
-              <option value="contain">Contain（余白あり）</option>
-              <option value="cover">Cover（はみ出し）</option>
-              <option value="none">None（元サイズ）</option>
+              <option value="contain">フィット（余白あり）</option>
+              <option value="cover">カバー（はみ出し）</option>
+              <option value="none">なし（元サイズ）</option>
             </select>
           </Field>
           <Field label="スケール">

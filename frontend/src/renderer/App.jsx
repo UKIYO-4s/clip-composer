@@ -447,6 +447,20 @@ function App() {
         return;
       }
 
+      // Cmd/Ctrl+S: 上書き保存
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSaveProject();
+        return;
+      }
+
+      // Cmd/Ctrl+Shift+S: 名前を付けて保存
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSaveAsProject();
+        return;
+      }
+
       // Cmd/Ctrl+C: コピー
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         e.preventDefault();
