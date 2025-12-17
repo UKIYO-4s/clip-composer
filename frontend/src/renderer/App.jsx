@@ -49,7 +49,75 @@ import {
   selectProjectPath,
   selectIsDirty,
 } from './store/projectSlice';
-import { selectAllRandomLayers, loadRandomLayers, clearRandomLayers } from './store/randomLayerSlice';
+import { selectAllRandomLayers, loadRandomLayers, clearRandomLayers, createRandomLayer } from './store/randomLayerSlice';
+import { updateClip } from './store/timelineSlice';
+
+/**
+ * 既存プロジェクト読み込み時のランダムレイヤー移行処理
+ * - randomLayerIdを持たないrandom_layerクリップを検出
+ * - folderPathでグループ化し、共有リソースとして登録
+ * - 各クリップにrandomLayerIdを付与
+ */
+const migrateRandomLayerClips = (layers, existingRandomLayers = []) => {
+  const clipUpdates = []; // { layerId, clipId, randomLayerId }
+  const newRandomLayers = []; // 新規作成するランダムレイヤー
+  const folderToLayerIdMap = new Map(); // folderPath → randomLayerId のマップ
+
+  // 既存のrandomLayersをマップに登録
+  existingRandomLayers.forEach(rl => {
+    if (rl.folderPath) {
+      folderToLayerIdMap.set(rl.folderPath, rl.id);
+    }
+  });
+
+  // 全クリップを走査
+  Object.entries(layers).forEach(([layerId, layer]) => {
+    if (!layer.clips) return;
+
+    layer.clips.forEach(clip => {
+      if (clip.type !== 'random_layer') return;
+
+      // 既にrandomLayerIdがあり、対応するrandomLayerが存在する場合はスキップ
+      if (clip.randomLayerId) {
+        const exists = existingRandomLayers.some(rl => rl.id === clip.randomLayerId) ||
+                       newRandomLayers.some(rl => rl.id === clip.randomLayerId);
+        if (exists) return;
+      }
+
+      // folderPathがない場合はスキップ
+      if (!clip.folderPath) return;
+
+      // 同じfolderPathのrandomLayerがあるか確認
+      let randomLayerId = folderToLayerIdMap.get(clip.folderPath);
+
+      if (!randomLayerId) {
+        // 新しいrandomLayerを作成
+        randomLayerId = `random-layer-migrated-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const folderName = clip.folderPath.split('/').pop() || 'ランダム素材';
+
+        newRandomLayers.push({
+          id: randomLayerId,
+          name: `${folderName}`,
+          folderPath: clip.folderPath,
+          assets: [], // 後でリフレッシュ可能
+        });
+
+        folderToLayerIdMap.set(clip.folderPath, randomLayerId);
+      }
+
+      // クリップにrandomLayerIdがない、または対応するrandomLayerが存在しない場合は更新
+      if (clip.randomLayerId !== randomLayerId) {
+        clipUpdates.push({
+          layerId,
+          clipId: clip.id,
+          randomLayerId,
+        });
+      }
+    });
+  });
+
+  return { clipUpdates, newRandomLayers };
+};
 
 function App() {
   const dispatch = useDispatch();
@@ -259,10 +327,37 @@ function App() {
       }
 
       // ランダムレイヤー状態を復元
-      if (projectData.randomLayers) {
-        dispatch(loadRandomLayers(projectData.randomLayers));
+      const existingRandomLayers = projectData.randomLayers || [];
+      if (existingRandomLayers.length > 0) {
+        dispatch(loadRandomLayers(existingRandomLayers));
       } else {
         dispatch(clearRandomLayers());
+      }
+
+      // 既存random_layerクリップの移行処理
+      if (projectData.timeline?.layers) {
+        const { clipUpdates, newRandomLayers } = migrateRandomLayerClips(
+          projectData.timeline.layers,
+          existingRandomLayers
+        );
+
+        // 新規ランダムレイヤーを登録
+        newRandomLayers.forEach(rl => {
+          dispatch(createRandomLayer(rl));
+        });
+
+        // クリップにrandomLayerIdを付与
+        clipUpdates.forEach(({ layerId, clipId, randomLayerId }) => {
+          dispatch(updateClip({
+            layerId,
+            clipId,
+            updates: { randomLayerId },
+          }));
+        });
+
+        if (newRandomLayers.length > 0 || clipUpdates.length > 0) {
+          console.log(`Migrated ${clipUpdates.length} clips, created ${newRandomLayers.length} random layers`);
+        }
       }
 
       dispatch(addRecentFile(loadPath));
@@ -369,10 +464,37 @@ function App() {
       }
 
       // ランダムレイヤー状態を復元
-      if (templateData.randomLayers) {
-        dispatch(loadRandomLayers(templateData.randomLayers));
+      const existingRandomLayers = templateData.randomLayers || [];
+      if (existingRandomLayers.length > 0) {
+        dispatch(loadRandomLayers(existingRandomLayers));
       } else {
         dispatch(clearRandomLayers());
+      }
+
+      // 既存random_layerクリップの移行処理
+      if (templateData.timeline?.layers) {
+        const { clipUpdates, newRandomLayers } = migrateRandomLayerClips(
+          templateData.timeline.layers,
+          existingRandomLayers
+        );
+
+        // 新規ランダムレイヤーを登録
+        newRandomLayers.forEach(rl => {
+          dispatch(createRandomLayer(rl));
+        });
+
+        // クリップにrandomLayerIdを付与
+        clipUpdates.forEach(({ layerId, clipId, randomLayerId }) => {
+          dispatch(updateClip({
+            layerId,
+            clipId,
+            updates: { randomLayerId },
+          }));
+        });
+
+        if (newRandomLayers.length > 0 || clipUpdates.length > 0) {
+          console.log(`Migrated ${clipUpdates.length} clips, created ${newRandomLayers.length} random layers`);
+        }
       }
 
       dispatch(setDirty(true)); // 新規作成なのでdirtyにする

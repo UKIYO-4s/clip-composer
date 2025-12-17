@@ -20,6 +20,7 @@ import {
   selectExportSettings,
 } from '../../store/exportSlice';
 import { selectResolution, selectFps } from '../../store/timelineSlice';
+import { selectAllRandomLayers } from '../../store/randomLayerSlice';
 import { useExportTimer } from '../../hooks';
 import ExportProgress from './ExportProgress';
 import { Button, Input, Select, IconButton } from '../ui';
@@ -88,6 +89,7 @@ function ExportDialog() {
   const timeline = useSelector((state) => state.timeline);
   const projectResolution = useSelector(selectResolution);
   const projectFps = useSelector(selectFps);
+  const randomLayers = useSelector(selectAllRandomLayers);
 
   const [outputPath, setOutputPath] = useState('');
   const [startTime, setStartTime] = useState(null);
@@ -241,12 +243,13 @@ function ExportDialog() {
 
     const resolution = getResolution();
 
-    // タイムラインデータを準備
+    // タイムラインデータを準備（randomLayersも含める）
     const timelineData = {
       fps: settings.fps,
       totalFrames: timeline.totalFrames,
       layers: timeline.layers,
       layerOrder: timeline.layerOrder,
+      randomLayers: randomLayers, // ランダムレイヤー共有リソース
     };
 
     const options = {
@@ -304,12 +307,13 @@ function ExportDialog() {
 
     const resolution = getResolution();
 
-    // タイムラインデータを準備
+    // タイムラインデータを準備（randomLayersも含める）
     const timelineData = {
       fps: settings.fps,
       totalFrames: timeline.totalFrames,
       layers: timeline.layers,
       layerOrder: timeline.layerOrder,
+      randomLayers: randomLayers, // ランダムレイヤー共有リソース
     };
 
     const options = {
