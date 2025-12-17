@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
@@ -1146,6 +1146,17 @@ ipcMain.handle('license-grace-remaining', async () => {
     return { success: true, remainingHours: licenseManager.getGracePeriodRemaining() };
   } catch (error) {
     console.error('Failed to get grace period:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// フォルダを開く（Finderで表示）
+ipcMain.handle('open-folder', async (event, { path: filePath }) => {
+  try {
+    shell.showItemInFolder(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to open folder:', error);
     return { success: false, error: error.message };
   }
 });

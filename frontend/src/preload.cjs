@@ -59,13 +59,8 @@ contextBridge.exposeInMainWorld('api', {
   // Save file dialog
   saveFile: (options) => ipcRenderer.invoke('save-file', options),
 
-  // Export operations (legacy)
-  exportVideo: (data) => ipcRenderer.invoke('export-video', data),
-
-  // Progress listener (legacy)
-  onExportProgress: (callback) => {
-    ipcRenderer.on('export-progress', (event, data) => callback(data));
-  },
+  // フォルダを開く（Finderで表示）
+  openFolder: (filePath) => ipcRenderer.invoke('open-folder', { path: filePath }),
 
   // Cleanup
   removeAllListeners: (channel) => {

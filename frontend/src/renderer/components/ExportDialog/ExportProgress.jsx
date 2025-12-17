@@ -26,8 +26,7 @@ function ExportProgress({
   const handleOpenFolder = async () => {
     if (outputPath) {
       try {
-        // Electron shell.showItemInFolder を呼び出す
-        await window.api.python.invoke('open_folder', { path: outputPath });
+        await window.api.openFolder(outputPath);
       } catch (err) {
         console.error('Failed to open folder:', err);
       }
