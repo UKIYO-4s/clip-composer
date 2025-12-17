@@ -30,9 +30,9 @@ contextBridge.exposeInMainWorld('api', {
     }),
 
     // CSV一括レンダリング開始
-    renderBatch: (timelineData, csvPath, outputDir, options = {}, parallel = false, maxWorkers = null) => ipcRenderer.invoke('python-invoke', {
+    renderBatch: (timelineData, csvPath, outputDir, options = {}) => ipcRenderer.invoke('python-invoke', {
       command: 'render_batch',
-      params: { timelineData, csvPath, outputDir, options, parallel, maxWorkers }
+      params: { timelineData, csvPath, outputDir, options }
     }),
 
     // レンダリングキャンセル

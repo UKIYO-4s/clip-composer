@@ -10,6 +10,7 @@ import FileMenu from './components/Menu/FileMenu';
 import ExportDialog from './components/ExportDialog';
 import NewProjectDialog from './components/NewProjectDialog';
 import { UpdateBanner, ReleaseNotesPanel, useUpdateListener } from './components/Update';
+import { RandomLayerPanel } from './components/RandomLayer';
 import useAutoSave from './hooks/useAutoSave';
 import { openExportDialog } from './store/exportSlice';
 import { openReleaseNotes } from './store/updateSlice';
@@ -48,6 +49,7 @@ import {
   selectProjectPath,
   selectIsDirty,
 } from './store/projectSlice';
+import { selectAllRandomLayers, loadRandomLayers, clearRandomLayers } from './store/randomLayerSlice';
 
 function App() {
   const dispatch = useDispatch();
@@ -70,6 +72,7 @@ function App() {
   const canRedo = useSelector(selectCanRedo);
   const resolution = useSelector(selectResolution);
   const fps = useSelector(selectFps);
+  const randomLayers = useSelector(selectAllRandomLayers);
   const { currentVersion, status: updateStatus, availableUpdate } = useSelector((state) => state.update);
 
   // 自動保存（3分間隔）
@@ -121,6 +124,7 @@ function App() {
           resolution: resolution,
           fps: fps,
         },
+        randomLayers: randomLayers, // ランダムレイヤー共有リソース
       };
 
       // 保存
@@ -139,7 +143,7 @@ function App() {
       console.error('Error saving project:', error);
       alert('プロジェクト保存エラー: ' + error.message);
     }
-  }, [dispatch, projectPath, projectName, layers, layerOrder, totalFrames, assets, resolution, fps]);
+  }, [dispatch, projectPath, projectName, layers, layerOrder, totalFrames, assets, resolution, fps, randomLayers]);
 
   // 名前を付けて保存
   const handleSaveAsProject = useCallback(async () => {
@@ -172,6 +176,7 @@ function App() {
           resolution: resolution,
           fps: fps,
         },
+        randomLayers: randomLayers, // ランダムレイヤー共有リソース
       };
 
       // 保存
@@ -191,7 +196,7 @@ function App() {
       console.error('Error saving project:', error);
       alert('プロジェクト保存エラー: ' + error.message);
     }
-  }, [dispatch, projectName, layers, layerOrder, totalFrames, assets, resolution, fps]);
+  }, [dispatch, projectName, layers, layerOrder, totalFrames, assets, resolution, fps, randomLayers]);
 
   // プロジェクト読み込み処理
   const handleLoadProject = useCallback(async (filePath = null) => {
@@ -253,6 +258,13 @@ function App() {
         dispatch(setAssets(projectData.assets));
       }
 
+      // ランダムレイヤー状態を復元
+      if (projectData.randomLayers) {
+        dispatch(loadRandomLayers(projectData.randomLayers));
+      } else {
+        dispatch(clearRandomLayers());
+      }
+
       dispatch(addRecentFile(loadPath));
       console.log('Project fully restored:', loadPath);
     } catch (error) {
@@ -296,6 +308,7 @@ function App() {
           resolution: resolution,
           fps: fps,
         },
+        randomLayers: randomLayers, // ランダムレイヤー共有リソース
       };
 
       const result = await window.api.templates.save(templateName, projectData);
@@ -309,7 +322,7 @@ function App() {
       console.error('Error saving template:', error);
       alert('テンプレート保存エラー: ' + error.message);
     }
-  }, [projectName, layers, layerOrder, totalFrames, assets, resolution, fps]);
+  }, [projectName, layers, layerOrder, totalFrames, assets, resolution, fps, randomLayers]);
 
   // テンプレートから読み込み
   const handleLoadTemplate = useCallback(async (templateName) => {
@@ -353,6 +366,13 @@ function App() {
       // アセット状態を復元
       if (templateData.assets) {
         dispatch(setAssets(templateData.assets));
+      }
+
+      // ランダムレイヤー状態を復元
+      if (templateData.randomLayers) {
+        dispatch(loadRandomLayers(templateData.randomLayers));
+      } else {
+        dispatch(clearRandomLayers());
       }
 
       dispatch(setDirty(true)); // 新規作成なのでdirtyにする
@@ -802,6 +822,9 @@ function App() {
 
         {/* Release Notes Panel */}
         <ReleaseNotesPanel />
+
+        {/* Random Layer Management Panel */}
+        <RandomLayerPanel />
       </div>
     </DndProvider>
   );

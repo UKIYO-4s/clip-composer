@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateClip, saveToHistory } from '../../store/timelineSlice';
-import { ChevronDown } from '../Icons';
-import { Input } from '../ui';
+import { openRandomLayerPanel, selectRandomLayerById, selectAllRandomLayers } from '../../store/randomLayerSlice';
+import { ChevronDown, Settings } from '../Icons';
+import { Input, Button } from '../ui';
 import EffectSection from './EffectSection';
 import FontSelector from '../FontSelector/FontSelector';
 
@@ -786,6 +787,33 @@ const PropertyPanel = () => {
           <p className="text-xs text-ink-muted mt-1">
             プレビューに色付き矩形を表示します（エクスポートには含まれません）
           </p>
+        </Section>
+      )}
+
+      {/* ランダムレイヤー管理（random_layer用） */}
+      {clip.type === 'random_layer' && (
+        <Section title="ランダムレイヤー" defaultOpen={true}>
+          <div className="space-y-2">
+            <Field label="フォルダパス">
+              <p className="text-xs text-ink-secondary truncate" title={clip.folderPath}>
+                {clip.folderPath || '(未設定)'}
+              </p>
+            </Field>
+            {clip.randomLayerId && (
+              <p className="text-xs text-ink-muted">
+                共有ID: {clip.randomLayerId.slice(-8)}
+              </p>
+            )}
+            <Button
+              variant="subtle"
+              size="sm"
+              onClick={() => dispatch(openRandomLayerPanel())}
+              className="w-full flex items-center justify-center gap-1"
+            >
+              <Settings className="w-3 h-3" />
+              ランダムレイヤー管理
+            </Button>
+          </div>
         </Section>
       )}
 

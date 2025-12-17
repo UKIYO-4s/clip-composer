@@ -74,6 +74,7 @@ export {
 
   // Random Layer Management
   RotateCcw,
+  RefreshCw,
 
   // Undo/Redo
   Undo2 as Undo,

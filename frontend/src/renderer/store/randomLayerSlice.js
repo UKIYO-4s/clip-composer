@@ -22,6 +22,7 @@ const initialState = {
   //   currentIndex: number,   // 現在の使用位置
   //   createdAt: number,
   // }
+  isPanelOpen: false, // 管理パネルの表示状態
 };
 
 const randomLayerSlice = createSlice({
@@ -30,8 +31,8 @@ const randomLayerSlice = createSlice({
   reducers: {
     // ランダムレイヤーを作成
     createRandomLayer: (state, action) => {
-      const { name, folderPath, assets } = action.payload;
-      const id = `random-layer-${Date.now()}`;
+      const { id: providedId, name, folderPath, assets } = action.payload;
+      const id = providedId || `random-layer-${Date.now()}`;
 
       state.layers.push({
         id,
@@ -104,11 +105,30 @@ const randomLayerSlice = createSlice({
       const { layerId } = action.payload;
       state.layers = state.layers.filter(l => l.id !== layerId);
     },
+
+    // パネル開閉
+    openRandomLayerPanel: (state) => {
+      state.isPanelOpen = true;
+    },
+    closeRandomLayerPanel: (state) => {
+      state.isPanelOpen = false;
+    },
+
+    // プロジェクト読み込み時に状態を復元
+    loadRandomLayers: (state, action) => {
+      state.layers = action.payload || [];
+    },
+
+    // 全ランダムレイヤーをクリア
+    clearRandomLayers: (state) => {
+      state.layers = [];
+    },
   },
 });
 
 // セレクター
 export const selectAllRandomLayers = (state) => state.randomLayers.layers;
+export const selectIsPanelOpen = (state) => state.randomLayers.isPanelOpen;
 
 export const selectRandomLayerById = (layerId) =>
   createSelector(
@@ -149,6 +169,10 @@ export const {
   consumeMultipleAssets,
   resetLayerUsage,
   deleteRandomLayer,
+  openRandomLayerPanel,
+  closeRandomLayerPanel,
+  loadRandomLayers,
+  clearRandomLayers,
 } = randomLayerSlice.actions;
 
 export default randomLayerSlice.reducer;

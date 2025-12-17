@@ -9,6 +9,10 @@ const initialState = {
   estimatedRemaining: 0,
   error: null,
   outputPath: null,
+  // タイマー更新用
+  exportStartTime: null,        // エクスポート開始時刻（Date.now()）
+  lastProgressPercent: 0,       // 最後に受け取った進捗率（0-100）
+  lastProgressTimestamp: null,  // 最後に進捗を受け取った時刻
   settings: {
     resolution: '1080x1920',  // 縦動画デフォルト（TikTok/Reels/Shorts）
     customWidth: 1080,
@@ -81,6 +85,10 @@ const exportSlice = createSlice({
       state.estimatedRemaining = 0;
       state.error = null;
       state.outputPath = action.payload.outputPath;
+      // タイマー用（0.001で初期化してETA計算を即時開始）
+      state.exportStartTime = action.payload.startTime || Date.now();
+      state.lastProgressPercent = 0.001;
+      state.lastProgressTimestamp = Date.now();
     },
     startBatchExport: (state, action) => {
       state.isExporting = true;
@@ -98,10 +106,19 @@ const exportSlice = createSlice({
         errorCount: 0,
         errors: [],
       };
+      // タイマー用（0.001で初期化してETA計算を即時開始）
+      state.exportStartTime = action.payload.startTime || Date.now();
+      state.lastProgressPercent = 0.001;
+      state.lastProgressTimestamp = Date.now();
     },
     updateProgress: (state, action) => {
       const { progress, message, elapsedTime, estimatedRemaining } = action.payload;
-      if (progress !== undefined) state.progress = progress;
+      if (progress !== undefined && progress >= 0) {
+        state.progress = progress;
+        // 有効な進捗の場合のみタイマー用stateを更新
+        state.lastProgressPercent = progress;
+        state.lastProgressTimestamp = Date.now();
+      }
       if (message !== undefined) state.currentTask = message;
       if (elapsedTime !== undefined) state.elapsedTime = elapsedTime;
       if (estimatedRemaining !== undefined) state.estimatedRemaining = estimatedRemaining;
@@ -116,8 +133,18 @@ const exportSlice = createSlice({
 
       // 進捗率を計算
       if (state.batchProgress.total > 0) {
-        state.progress = (state.batchProgress.current / state.batchProgress.total) * 100;
+        const newProgress = (state.batchProgress.current / state.batchProgress.total) * 100;
+        state.progress = newProgress;
+        // タイマー用stateを更新
+        state.lastProgressPercent = newProgress;
+        state.lastProgressTimestamp = Date.now();
       }
+    },
+    // タイマーからの時間更新専用（進捗率は変更しない）
+    updateTimeOnly: (state, action) => {
+      const { elapsedTime, estimatedRemaining } = action.payload;
+      if (elapsedTime !== undefined) state.elapsedTime = elapsedTime;
+      if (estimatedRemaining !== undefined) state.estimatedRemaining = estimatedRemaining;
     },
     addBatchError: (state, action) => {
       state.batchProgress.errorCount += 1;
@@ -188,6 +215,7 @@ export const {
   startBatchExport,
   updateProgress,
   updateBatchProgress,
+  updateTimeOnly,
   addBatchError,
   incrementBatchSuccess,
   exportSuccess,

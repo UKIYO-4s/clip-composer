@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addClip, selectLayerOrder, selectLayers, saveToHistory, selectResolution, selectFps } from '../../store/timelineSlice';
+import { createRandomLayer, selectAllRandomLayers } from '../../store/randomLayerSlice';
 import { Button, IconButton, Input, Select } from '../ui';
 import { X } from '../Icons';
 
@@ -159,7 +160,7 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
   }, [resolution, currentAspectRatio, scale, positionX, positionY]);
 
   // 一括配置実行
-  const handleBulkPlace = useCallback(() => {
+  const handleBulkPlace = useCallback(async () => {
     // バリデーション
     if (!folderPath || folderPath.trim() === '') {
       setErrorMessage('素材フォルダを選択してください');
@@ -177,38 +178,72 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     // エラーをクリア
     setErrorMessage('');
 
-    // 履歴に保存
-    dispatch(saveToHistory());
+    try {
+      // フォルダ内のファイル一覧を取得
+      const files = await window.api.fs.readDir(folderPath);
+      const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+      const allowedExtensions = [...videoExtensions, ...imageExtensions];
 
-    let currentFramePos = calculateStartFrame();
-    const gap = placementMode === 'continuous' ? 0 : gapFrames;
+      const assets = files
+        .filter(file => {
+          const ext = file.toLowerCase().slice(file.lastIndexOf('.'));
+          return allowedExtensions.includes(ext);
+        })
+        .map(file => `${folderPath}/${file}`);
 
-    for (let i = 0; i < clipCount; i++) {
-      const clipData = {
-        id: generateId(),
-        type: 'random_layer',
-        name: `ランダム ${i + 1}`,
-        startFrame: currentFramePos,
-        durationFrames: clipDuration,
-        opacity: 100,
-        // 位置・スケール（scaleはパーセント値のまま保存、レンダラーが100で割る）
-        positionX: positionX,
-        positionY: positionY,
-        scale: scale,
-        // ランダムレイヤー固有プロパティ
+      if (assets.length === 0) {
+        setErrorMessage('フォルダ内に対応する素材ファイルがありません');
+        return;
+      }
+
+      // 履歴に保存
+      dispatch(saveToHistory());
+
+      // ランダムレイヤーを作成（共有リソースとして管理）
+      const randomLayerId = `random-layer-${Date.now()}`;
+      dispatch(createRandomLayer({
+        id: randomLayerId,
+        name: `ランダム素材 ${folderPath.split('/').pop()}`,
         folderPath: folderPath,
-        selectionMode: selectionMode,
-        extensions: '.mp4,.mov,.avi',
-        fileLimit: 0,
-        randomSeed: Math.random(), // 各クリップで異なるランダムシード
-      };
+        assets: assets,
+      }));
 
-      dispatch(addClip({ layerId: targetLayer, clip: clipData }));
+      let currentFramePos = calculateStartFrame();
+      const gap = placementMode === 'continuous' ? 0 : gapFrames;
 
-      currentFramePos += clipDuration + gap;
+      for (let i = 0; i < clipCount; i++) {
+        const clipData = {
+          id: generateId(),
+          type: 'random_layer',
+          name: `ランダム ${i + 1}`,
+          startFrame: currentFramePos,
+          durationFrames: clipDuration,
+          opacity: 100,
+          // 位置・スケール（scaleはパーセント値のまま保存、レンダラーが100で割る）
+          positionX: positionX,
+          positionY: positionY,
+          scale: scale,
+          // ランダムレイヤー参照（共有リソースID）
+          randomLayerId: randomLayerId,
+          // 後方互換性のため folderPath も保持（既存のエクスポート処理で使用）
+          folderPath: folderPath,
+          selectionMode: selectionMode,
+          extensions: '.mp4,.mov,.avi',
+          fileLimit: 0,
+          randomSeed: Math.random(), // 各クリップで異なるランダムシード
+        };
+
+        dispatch(addClip({ layerId: targetLayer, clip: clipData }));
+
+        currentFramePos += clipDuration + gap;
+      }
+
+      onClose();
+    } catch (err) {
+      console.error('Failed to place random layer clips:', err);
+      setErrorMessage('素材フォルダの読み込みに失敗しました');
     }
-
-    onClose();
   }, [dispatch, calculateStartFrame, clipCount, clipDuration, placementMode, gapFrames, targetLayer, folderPath, selectionMode, positionX, positionY, scale, onClose]);
 
   if (!isOpen) return null;

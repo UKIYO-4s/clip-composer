@@ -20,6 +20,7 @@ import {
   selectExportSettings,
 } from '../../store/exportSlice';
 import { selectResolution, selectFps } from '../../store/timelineSlice';
+import { useExportTimer } from '../../hooks';
 import ExportProgress from './ExportProgress';
 import { Button, Input, Select, IconButton } from '../ui';
 
@@ -90,8 +91,6 @@ function ExportDialog() {
 
   const [outputPath, setOutputPath] = useState('');
   const [startTime, setStartTime] = useState(null);
-  const [parallelProcessing, setParallelProcessing] = useState(false);
-  const [maxWorkers, setMaxWorkers] = useState(null); // null = auto
 
   const {
     isExporting,
@@ -106,6 +105,9 @@ function ExportDialog() {
 
   // タイムラインから抽出したCSVカラム（hooksは条件付きreturnの前に呼ぶ必要がある）
   const csvColumns = useMemo(() => extractCsvColumns(timeline), [timeline]);
+
+  // エクスポート中のタイマーをリアルタイム更新
+  useExportTimer();
 
   // ダイアログが開いていなければ何も表示しない
   if (!isDialogOpen) return null;
@@ -255,7 +257,7 @@ function ExportDialog() {
 
     // 開始時刻をローカル変数で保持（クロージャでキャプチャ）
     const exportStartTime = Date.now();
-    dispatch(startExport({ outputPath }));
+    dispatch(startExport({ outputPath, startTime: exportStartTime }));
     setStartTime(exportStartTime);
 
     try {
@@ -318,7 +320,7 @@ function ExportDialog() {
 
     // 開始時刻をローカル変数で保持（クロージャでキャプチャ）
     const batchStartTime = Date.now();
-    dispatch(startBatchExport({ total: 0 }));
+    dispatch(startBatchExport({ total: 0, startTime: batchStartTime }));
     setStartTime(batchStartTime);
 
     try {
@@ -357,8 +359,8 @@ function ExportDialog() {
         }
       });
 
-      // CSV一括レンダリング実行（並列処理オプション付き）
-      const result = await window.api.python.renderBatch(timelineData, csvPath, outputPath, options, parallelProcessing, maxWorkers);
+      // CSV一括レンダリング実行
+      const result = await window.api.python.renderBatch(timelineData, csvPath, outputPath, options);
 
       removeProgressListener();
 
@@ -658,31 +660,6 @@ function ExportDialog() {
                   </div>
                 </div>
               </div>
-
-              {/* 並列処理オプション（CSV一括書き出しのみ） */}
-              {exportMode === 'batch' && (
-                <div className="p-3 rounded bg-surface-sunken border border-line">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="parallelProcessing"
-                      checked={parallelProcessing}
-                      onChange={(e) => setParallelProcessing(e.target.checked)}
-                      className="w-4 h-4 rounded border-line bg-surface text-accent-blue focus:ring-accent-blue"
-                    />
-                    <label htmlFor="parallelProcessing" className="text-sm text-white cursor-pointer">
-                      並列処理を有効にする
-                    </label>
-                  </div>
-                  {parallelProcessing && (
-                    <div className="mt-2 text-xs text-ink-muted">
-                      複数のCPUコアを使用して動画を同時に生成します。
-                      大量の動画を書き出す際に処理速度が向上しますが、
-                      メモリ使用量が増加します。
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* 出力先 */}
               <div>
