@@ -9,8 +9,10 @@ import AssetPanel from './components/AssetPanel';
 import FileMenu from './components/Menu/FileMenu';
 import ExportDialog from './components/ExportDialog';
 import NewProjectDialog from './components/NewProjectDialog';
+import { UpdateBanner, ReleaseNotesPanel, useUpdateListener } from './components/Update';
 import useAutoSave from './hooks/useAutoSave';
 import { openExportDialog } from './store/exportSlice';
+import { openReleaseNotes } from './store/updateSlice';
 import { setShowNewProjectDialog } from './store/timelineSlice';
 import { Button } from './components/ui';
 import {
@@ -68,12 +70,16 @@ function App() {
   const canRedo = useSelector(selectCanRedo);
   const resolution = useSelector(selectResolution);
   const fps = useSelector(selectFps);
+  const { currentVersion, status: updateStatus, availableUpdate } = useSelector((state) => state.update);
 
   // 自動保存（3分間隔）
   const { lastSaveTime, isSaving } = useAutoSave({
     interval: 3 * 60 * 1000,
     enabled: true,
   });
+
+  // アップデートイベントリスナー
+  useUpdateListener();
 
   // エクスポートダイアログを開く
   const handleOpenExport = useCallback(() => {
@@ -758,8 +764,31 @@ function App() {
         <Timeline />
 
         {/* Footer */}
-        <footer className="flex h-6 items-center justify-center border-t border-line bg-surface-raised">
-          <span className="text-xs text-ink-muted">Clip Composer v1.0.0</span>
+        <footer className="flex h-6 items-center justify-between border-t border-line bg-surface-raised px-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => dispatch(openReleaseNotes())}
+              className="text-xs text-ink-muted hover:text-ink-secondary"
+            >
+              Clip Composer v{currentVersion || '1.0.0'}
+            </button>
+            {updateStatus === 'available' && (
+              <span className="rounded bg-accent-purple/20 px-1.5 py-0.5 text-xs text-accent-purple">
+                v{availableUpdate?.version} 利用可能
+              </span>
+            )}
+            {updateStatus === 'downloaded' && (
+              <span className="rounded bg-accent-green/20 px-1.5 py-0.5 text-xs text-accent-green">
+                アップデート準備完了
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => dispatch(openReleaseNotes())}
+            className="text-xs text-ink-muted hover:text-accent-blue"
+          >
+            アップデート情報
+          </button>
         </footer>
 
         {/* Export Dialog */}
@@ -767,6 +796,12 @@ function App() {
 
         {/* New Project Dialog */}
         <NewProjectDialog onLoadProject={handleLoadProject} />
+
+        {/* Update Banner */}
+        <UpdateBanner />
+
+        {/* Release Notes Panel */}
+        <ReleaseNotesPanel />
       </div>
     </DndProvider>
   );

@@ -146,4 +146,61 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener('license-grace-warning', handler);
     },
   },
+
+  // 自動アップデート
+  update: {
+    // アップデートチェック
+    checkForUpdates: () => ipcRenderer.invoke('update-check'),
+
+    // アップデートダウンロード
+    downloadUpdate: () => ipcRenderer.invoke('update-download'),
+
+    // アップデート適用（再起動）
+    quitAndInstall: () => ipcRenderer.invoke('update-quit-and-install'),
+
+    // 現在のバージョン取得
+    getVersion: () => ipcRenderer.invoke('get-app-version'),
+
+    // アップデートチェック中リスナー
+    onChecking: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('update-checking', handler);
+      return () => ipcRenderer.removeListener('update-checking', handler);
+    },
+
+    // アップデート利用可能リスナー
+    onUpdateAvailable: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on('update-available', handler);
+      return () => ipcRenderer.removeListener('update-available', handler);
+    },
+
+    // アップデートなしリスナー
+    onUpdateNotAvailable: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on('update-not-available', handler);
+      return () => ipcRenderer.removeListener('update-not-available', handler);
+    },
+
+    // ダウンロード進捗リスナー
+    onDownloadProgress: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on('update-download-progress', handler);
+      return () => ipcRenderer.removeListener('update-download-progress', handler);
+    },
+
+    // ダウンロード完了リスナー
+    onUpdateDownloaded: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on('update-downloaded', handler);
+      return () => ipcRenderer.removeListener('update-downloaded', handler);
+    },
+
+    // エラーリスナー
+    onError: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on('update-error', handler);
+      return () => ipcRenderer.removeListener('update-error', handler);
+    },
+  },
 });

@@ -6,6 +6,13 @@ export default {
     output: 'dist',
     buildResources: 'assets',
   },
+  // 自動アップデート用のpublish設定（GitHub Releases）
+  publish: {
+    provider: 'github',
+    owner: 'UKIYO-4s',
+    repo: 'clip-composer',
+    releaseType: 'release',
+  },
   files: [
     'frontend/build/**/*',
     'frontend/src/main.cjs',

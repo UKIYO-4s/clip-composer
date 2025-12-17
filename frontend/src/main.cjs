@@ -4,6 +4,7 @@ const { spawn } = require('child_process');
 const crypto = require('crypto');
 const { getLicenseManager } = require('./license/LicenseManager.cjs');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 
 // UUID v4生成（crypto.randomUUID()を使用）
 const uuidv4 = () => crypto.randomUUID();
@@ -1203,5 +1204,126 @@ ipcMain.handle('license-open-main-window', async () => {
   } catch (error) {
     console.error('Failed to open main window:', error);
     return { success: false, error: 'UNKNOWN', message: error.message };
+  }
+});
+
+// ==============================
+// 自動アップデート機能
+// ==============================
+
+// 開発環境フラグ（署名なし環境での動作用）
+const ENABLE_AUTO_UPDATE = !isDev;
+
+// autoUpdater設定
+autoUpdater.autoDownload = false; // 自動ダウンロードは無効（ユーザー確認後にダウンロード）
+autoUpdater.autoInstallOnAppQuit = true;
+
+// autoUpdaterイベントハンドラ
+autoUpdater.on('checking-for-update', () => {
+  console.log('Checking for updates...');
+  if (mainWindow) {
+    mainWindow.webContents.send('update-checking');
+  }
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available:', info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-available', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseNotes: info.releaseNotes,
+    });
+  }
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  console.log('Update not available, current version is latest:', info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-not-available', {
+      version: info.version,
+    });
+  }
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  console.log(`Download progress: ${progressObj.percent.toFixed(1)}%`);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-download-progress', {
+      percent: progressObj.percent,
+      transferred: progressObj.transferred,
+      total: progressObj.total,
+      bytesPerSecond: progressObj.bytesPerSecond,
+    });
+  }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded:', info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-downloaded', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseNotes: info.releaseNotes,
+    });
+  }
+});
+
+autoUpdater.on('error', (error) => {
+  console.error('Auto-updater error:', error);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-error', {
+      message: error.message || 'Unknown error',
+    });
+  }
+});
+
+// アップデートチェック
+ipcMain.handle('update-check', async () => {
+  if (!ENABLE_AUTO_UPDATE) {
+    return { success: false, error: 'Auto-update disabled in development mode' };
+  }
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Check for updates failed:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// アップデートダウンロード開始
+ipcMain.handle('update-download', async () => {
+  if (!ENABLE_AUTO_UPDATE) {
+    return { success: false, error: 'Auto-update disabled in development mode' };
+  }
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (error) {
+    console.error('Download update failed:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// アップデート適用（再起動）
+ipcMain.handle('update-quit-and-install', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
+// 現在のバージョン取得
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+// 起動時に自動アップデートチェック（本番環境のみ）
+app.on('ready', () => {
+  if (ENABLE_AUTO_UPDATE) {
+    // 起動後少し待ってからチェック
+    setTimeout(() => {
+      autoUpdater.checkForUpdates().catch((err) => {
+        console.log('Auto-update check failed (non-critical):', err.message);
+      });
+    }, 5000);
   }
 });
