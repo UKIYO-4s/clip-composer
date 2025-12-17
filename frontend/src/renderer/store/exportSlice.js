@@ -33,6 +33,8 @@ const initialState = {
   // バッチ完了状態
   batchCompleted: false,
   failedRows: [], // リトライ用に失敗した行データを保持
+  // バッチETA表示フラグ（1本目完了までfalse）
+  showBatchEta: false,
 };
 
 // 解像度プリセット
@@ -99,6 +101,7 @@ const exportSlice = createSlice({
       state.error = null;
       state.batchCompleted = false;
       state.failedRows = [];
+      state.showBatchEta = false; // 1本目完了までETA非表示
       state.batchProgress = {
         current: 0,
         total: action.payload.total || 0,
@@ -130,6 +133,11 @@ const exportSlice = createSlice({
       if (message !== undefined) state.currentTask = message;
       if (elapsedTime !== undefined) state.elapsedTime = elapsedTime;
       if (estimatedRemaining !== undefined) state.estimatedRemaining = estimatedRemaining;
+
+      // 1本目完了後にETA表示を有効化
+      if (state.batchProgress.current >= 1 && !state.showBatchEta) {
+        state.showBatchEta = true;
+      }
 
       // 進捗率を計算
       if (state.batchProgress.total > 0) {
@@ -234,3 +242,4 @@ export const selectIsExporting = (state) => state.export.isExporting;
 export const selectIsDialogOpen = (state) => state.export.isDialogOpen;
 export const selectExportProgress = (state) => state.export.progress;
 export const selectExportSettings = (state) => state.export.settings;
+export const selectShowBatchEta = (state) => state.export.showBatchEta;

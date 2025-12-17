@@ -18,6 +18,7 @@ import {
   cancelExport,
   selectExportState,
   selectExportSettings,
+  selectShowBatchEta,
 } from '../../store/exportSlice';
 import { selectResolution, selectFps } from '../../store/timelineSlice';
 import { selectAllRandomLayers } from '../../store/randomLayerSlice';
@@ -90,6 +91,7 @@ function ExportDialog() {
   const projectResolution = useSelector(selectResolution);
   const projectFps = useSelector(selectFps);
   const randomLayers = useSelector(selectAllRandomLayers);
+  const showBatchEta = useSelector(selectShowBatchEta);
 
   const [outputPath, setOutputPath] = useState('');
   const [startTime, setStartTime] = useState(null);
@@ -531,6 +533,7 @@ function ExportDialog() {
                 error={error}
                 outputPath={outputPath}
                 onCancel={handleCancel}
+                showEta={exportMode === 'single' || showBatchEta}
               />
               {/* バッチ処理の進捗詳細 */}
               {exportMode === 'batch' && batchProgress.total > 0 && (

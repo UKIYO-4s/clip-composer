@@ -9,6 +9,7 @@ function ExportProgress({
   error,
   outputPath,
   onCancel,
+  showEta = true, // バッチモードで1本目完了前はfalse
 }) {
   // 時間フォーマット
   const formatTime = (seconds) => {
@@ -59,7 +60,9 @@ function ExportProgress({
       {!isComplete && !isFailed && (
         <div className="flex justify-between text-sm text-ink-muted">
           <span>経過時間: {formatTime(elapsedTime)}</span>
-          <span>残り時間: ~{formatTime(estimatedRemaining)}</span>
+          {showEta && (
+            <span>残り時間: ~{formatTime(estimatedRemaining)}</span>
+          )}
         </div>
       )}
 
