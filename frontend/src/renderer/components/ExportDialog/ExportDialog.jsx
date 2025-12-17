@@ -251,7 +251,6 @@ function ExportDialog() {
       resolution: [resolution.width, resolution.height],
       fps: projectFps,
       codec: settings.codec,
-      quality: settings.quality,
     };
 
     // 開始時刻をローカル変数で保持（クロージャでキャプチャ）
@@ -315,7 +314,6 @@ function ExportDialog() {
       resolution: [resolution.width, resolution.height],
       fps: projectFps,
       codec: settings.codec,
-      quality: settings.quality,
     };
 
     // 開始時刻をローカル変数で保持（クロージャでキャプチャ）
@@ -660,19 +658,6 @@ function ExportDialog() {
                   </div>
                 </div>
               </div>
-
-              {/* 品質 */}
-              <Select
-                label="品質"
-                value={settings.quality}
-                onChange={(e) => handleSettingChange('quality', e.target.value)}
-                options={[
-                  { value: 'high', label: '高（低速）' },
-                  { value: 'medium', label: '中' },
-                  { value: 'low', label: '低（高速）' },
-                ]}
-                className="w-full"
-              />
 
               {/* 並列処理オプション（CSV一括書き出しのみ） */}
               {exportMode === 'batch' && (

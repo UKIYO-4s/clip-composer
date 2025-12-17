@@ -14,7 +14,6 @@ const initialState = {
     customWidth: 1080,
     customHeight: 1920,
     fps: 30,
-    quality: 'medium',
     codec: 'libx264',
   },
   // CSV一括書き出し用
@@ -44,13 +43,6 @@ export const resolutionPresets = {
   // 正方形
   '1080x1080': { width: 1080, height: 1080 },
   'custom': null,
-};
-
-// 品質プリセット
-export const qualityPresets = {
-  high: { preset: 'slow', crf: 18 },
-  medium: { preset: 'medium', crf: 23 },
-  low: { preset: 'fast', crf: 28 },
 };
 
 const exportSlice = createSlice({

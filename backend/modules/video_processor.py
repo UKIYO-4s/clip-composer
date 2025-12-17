@@ -157,14 +157,14 @@ class VideoProcessor:
             if not MOVIEPY_AVAILABLE:
                 raise ImportError("MoviePy is not installed")
 
-            # デフォルトオプション
+            # デフォルトオプション（品質は固定: preset=medium, bitrate=5000k）
             default_options = {
                 'codec': 'libx264',
                 'audio_codec': 'aac',
-                'preset': 'medium',
+                'preset': 'medium',  # 固定値（品質選択機能は廃止）
                 'fps': timeline_data.get('fps', 30),
                 'threads': 4,
-                'bitrate': '5000k'
+                'bitrate': '5000k'   # 固定値（品質選択機能は廃止）
             }
 
             if options:

@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Release notes panel with GitHub Releases integration
 - Version display in footer with update status
 
+### Removed
+- 品質プリセット選択機能を廃止（出力設定は固定: preset=medium, bitrate=5000k に簡略化）
+
 ## [1.0.0] - 2024-12-17
 
 ### Added
