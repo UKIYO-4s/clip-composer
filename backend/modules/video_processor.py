@@ -236,6 +236,17 @@ class VideoProcessor:
                             ffmpeg_filter_applier.add_adjustment_layer(clip_data, start_frame, end_frame)
                         continue  # 調整レイヤーはMoviePyクリップとしては追加しない
 
+                    # テキスト系クリップのfontFamilyをログ出力
+                    clip_type = clip_data.get('type')
+                    if clip_type in ['text', 'variable_text', 'csv_text_placeholder']:
+                        font_family = clip_data.get('fontFamily')
+                        text_content = clip_data.get('textContent') or clip_data.get('template') or clip_data.get('csvColumnName')
+                        print(f"[TEXT] type={clip_type} fontFamily={font_family} text={text_content}")
+                        if not font_family:
+                            print(f"[TEXT] 警告: fontFamilyがNoneです。clip_data.keys={list(clip_data.keys())}")
+                            import json
+                            print(f"[TEXT] clip_data(全体): {json.dumps(clip_data, ensure_ascii=False, default=str)[:500]}")
+
                     clip = self._create_video_clip(clip_data, fps, resolution)
                     if clip:
                         video_clips.append(clip)
@@ -462,8 +473,25 @@ class VideoProcessor:
                 bg_color = clip_data.get('bgColor', '#000000')
                 clip_resolution = clip_data.get('resolution', resolution)
 
+                # フォントファミリーと文字装飾プロパティ
+                font_family = clip_data.get('fontFamily')
+                text_opacity = clip_data.get('textOpacity', 100)
+                stroke_width = clip_data.get('strokeWidth', 0)
+                stroke_color = clip_data.get('strokeColor')
+
+                # デバッグログ
+                print(f"[video_processor] テキストクリップ: text='{text[:20]}...', fontFamily='{font_family}'")
+                if not font_family:
+                    print(f"[video_processor] 警告: fontFamily が未指定です。clip_data keys: {list(clip_data.keys())}")
+
                 # テキスト画像の生成
-                text_image = self._create_text_image(text, font_size, text_color, bg_color, clip_resolution)
+                text_image = self._create_text_image(
+                    text, font_size, text_color, bg_color, clip_resolution,
+                    font_family=font_family,
+                    text_opacity=text_opacity,
+                    stroke_width=stroke_width,
+                    stroke_color=stroke_color
+                )
                 clip = ImageClip(text_image, duration=duration)
 
                 # アニメーションの適用
@@ -472,7 +500,7 @@ class VideoProcessor:
                     clip = self._apply_text_animation(clip, animation, fps)
 
             elif clip_type == 'random_layer':
-                # ランダムレイヤー: フォルダからメディアをランダム選択
+                # ランダムレイヤー（ネスト型コンテナ）: フォルダからメディアをランダム選択
                 if RANDOM_LAYER_AVAILABLE:
                     from .random_layer import is_video_file, is_image_file, is_gif_file
 
@@ -524,6 +552,10 @@ class VideoProcessor:
 
                         else:
                             print(f"警告: 未対応のファイル形式: {selected_file}")
+
+                        # エンベロープ（フェードイン/アウト）の適用
+                        if clip:
+                            clip = self._apply_envelope(clip, clip_data, fps)
                     else:
                         print(f"警告: ランダムレイヤーのファイルが見つかりません: {selected_file}")
                 else:
@@ -555,8 +587,25 @@ class VideoProcessor:
                 bg_color = clip_data.get('bgColor', '#000000')
                 clip_resolution = clip_data.get('resolution', resolution)
 
+                # フォントファミリーと文字装飾プロパティ
+                font_family = clip_data.get('fontFamily')
+                text_opacity = clip_data.get('textOpacity', 100)
+                stroke_width = clip_data.get('strokeWidth', 0)
+                stroke_color = clip_data.get('strokeColor')
+
+                # デバッグログ
+                print(f"[video_processor] 可変テキスト: text='{text[:20] if text else ''}...', fontFamily='{font_family}'")
+                if not font_family:
+                    print(f"[video_processor] 警告: fontFamily が未指定です。clip_data keys: {list(clip_data.keys())}")
+
                 # テキスト画像の生成
-                text_image = self._create_text_image(text, font_size, text_color, bg_color, clip_resolution)
+                text_image = self._create_text_image(
+                    text, font_size, text_color, bg_color, clip_resolution,
+                    font_family=font_family,
+                    text_opacity=text_opacity,
+                    stroke_width=stroke_width,
+                    stroke_color=stroke_color
+                )
                 clip = ImageClip(text_image, duration=duration)
 
                 # アニメーションの適用
@@ -579,8 +628,25 @@ class VideoProcessor:
                 bg_color = clip_data.get('bgColor', '#000000')
                 clip_resolution = clip_data.get('resolution', resolution)
 
+                # フォントファミリーと文字装飾プロパティ
+                font_family = clip_data.get('fontFamily')
+                text_opacity = clip_data.get('textOpacity', 100)
+                stroke_width = clip_data.get('strokeWidth', 0)
+                stroke_color = clip_data.get('strokeColor')
+
+                # デバッグログ
+                print(f"[video_processor] CSVテキスト: text='{text[:20] if text else ''}...', fontFamily='{font_family}'")
+                if not font_family:
+                    print(f"[video_processor] 警告: fontFamily が未指定です。clip_data keys: {list(clip_data.keys())}")
+
                 # テキスト画像の生成
-                text_image = self._create_text_image(text, font_size, text_color, bg_color, clip_resolution)
+                text_image = self._create_text_image(
+                    text, font_size, text_color, bg_color, clip_resolution,
+                    font_family=font_family,
+                    text_opacity=text_opacity,
+                    stroke_width=stroke_width,
+                    stroke_color=stroke_color
+                )
                 clip = ImageClip(text_image, duration=duration)
 
                 # アニメーションの適用
@@ -901,7 +967,11 @@ class VideoProcessor:
         font_size: int,
         text_color: str,
         bg_color: str,
-        resolution: tuple
+        resolution: tuple,
+        font_family: str = None,
+        text_opacity: float = 100,
+        stroke_width: int = 0,
+        stroke_color: str = None
     ) -> np.ndarray:
         """
         PIL/Pillowでテキスト画像を生成
@@ -912,10 +982,17 @@ class VideoProcessor:
             text_color: テキストカラー（hex形式）
             bg_color: 背景カラー（hex形式）
             resolution: 解像度
+            font_family: フォントファミリー名またはファイルパス（オプション）
+            text_opacity: テキスト不透明度（0-100、デフォルト: 100）
+            stroke_width: 縁取り幅（デフォルト: 0）
+            stroke_color: 縁取り色（hex形式、デフォルト: None）
 
         Returns:
             numpy array (RGBA)
         """
+        # ログ出力
+        print(f"[FONT] _create_text_image: requested='{font_family}'")
+
         # 背景色をRGBAに変換
         bg_rgba = self._hex_to_rgba(bg_color, alpha=0)  # 透明背景
 
@@ -923,8 +1000,12 @@ class VideoProcessor:
         img = Image.new('RGBA', resolution, bg_rgba)
         draw = ImageDraw.Draw(img)
 
-        # フォントの読み込み（日本語対応フォントを使用）
-        font = get_font(font_size)
+        # フォントの読み込み（font_familyを考慮）
+        font = get_font(font_size, font_family)
+
+        # 実際に使用するフォントパスをログ出力
+        font_path = font.path if hasattr(font, 'path') else 'unknown'
+        print(f"[FONT] _create_text_image: actual_path='{font_path}'")
 
         # テキストのサイズを取得
         bbox = draw.textbbox((0, 0), text, font=font)
@@ -935,11 +1016,20 @@ class VideoProcessor:
         x = (resolution[0] - text_width) // 2
         y = (resolution[1] - text_height) // 2
 
-        # テキストカラーをRGBAに変換
-        text_rgba = self._hex_to_rgba(text_color, alpha=255)
+        # テキスト不透明度を適用（0-100 → 0-255）
+        opacity_value = max(0, min(255, int((text_opacity / 100) * 255)))
 
-        # テキストを描画
-        draw.text((x, y), text, font=font, fill=text_rgba)
+        # テキストカラーをRGBAに変換（不透明度を適用）
+        text_rgba = self._hex_to_rgba(text_color, alpha=opacity_value)
+
+        # 縁取りを描画（ストロークがある場合）
+        if stroke_width > 0 and stroke_color:
+            stroke_rgba = self._hex_to_rgba(stroke_color, alpha=opacity_value)
+            draw.text((x, y), text, font=font, fill=text_rgba,
+                     stroke_width=stroke_width, stroke_fill=stroke_rgba)
+        else:
+            # テキストを描画（縁取りなし）
+            draw.text((x, y), text, font=font, fill=text_rgba)
 
         # numpy配列に変換
         return np.array(img)
@@ -968,6 +1058,91 @@ class VideoProcessor:
             r, g, b = 255, 255, 255
 
         return (r, g, b, alpha)
+
+    def _apply_envelope(self, clip, clip_data: Dict[str, Any], fps: float):
+        """
+        クリップにエンベロープ（フェードイン/アウト、スケール）を適用
+
+        Args:
+            clip: MoviePy clip object
+            clip_data: クリップデータ（envelope を含む場合あり）
+            fps: フレームレート
+
+        Returns:
+            Modified clip object
+        """
+        envelope = clip_data.get('envelope')
+        if not envelope:
+            return clip
+
+        clip_duration = clip.duration
+
+        # IN効果
+        in_env = envelope.get('in', {})
+        in_type = in_env.get('type', 'none')
+        in_duration_frames = in_env.get('duration_frames', 6)
+        in_duration = in_duration_frames / fps
+        in_easing = in_env.get('easing', 'ease_in_out')
+
+        # OUT効果
+        out_env = envelope.get('out', {})
+        out_type = out_env.get('type', 'none')
+        out_duration_frames = out_env.get('duration_frames', 6)
+        out_duration = out_duration_frames / fps
+        out_easing = out_env.get('easing', 'ease_in_out')
+
+        # イージング関数
+        def ease_func(t, easing_type):
+            if easing_type == 'linear':
+                return t
+            elif easing_type == 'ease_in':
+                return t * t
+            elif easing_type == 'ease_out':
+                return t * (2 - t)
+            else:  # ease_in_out
+                return t * t * (3 - 2 * t)
+
+        # フェード効果の計算
+        def opacity_func(get_frame, t):
+            opacity = 1.0
+
+            # IN: フェードイン
+            if in_type == 'fade' and t < in_duration:
+                progress = t / in_duration
+                opacity *= ease_func(progress, in_easing)
+
+            # OUT: フェードアウト
+            if out_type == 'fade' and t > clip_duration - out_duration:
+                progress = (clip_duration - t) / out_duration
+                opacity *= ease_func(progress, out_easing)
+
+            return get_frame(t) * opacity
+
+        # スケール効果の計算（MoviePyの制約上、resize関数を時間依存で使用）
+        # 注: 動的なスケールはフレームごとの処理が重くなるため、
+        #     現時点ではfadeのみをサポート
+
+        # フェード効果を適用
+        if in_type == 'fade' or out_type == 'fade':
+            # opacityの動的設定
+            def make_opacity_func(in_t, in_d, out_t, out_d, clip_d, in_e, out_e):
+                def opacity_t(t):
+                    opacity = 1.0
+                    # IN
+                    if in_t == 'fade' and t < in_d:
+                        progress = t / in_d
+                        opacity *= ease_func(progress, in_e)
+                    # OUT
+                    if out_t == 'fade' and t > clip_d - out_d:
+                        progress = (clip_d - t) / out_d
+                        opacity *= ease_func(progress, out_e)
+                    return opacity
+                return opacity_t
+
+            opacity_fn = make_opacity_func(in_type, in_duration, out_type, out_duration, clip_duration, in_easing, out_easing)
+            clip = clip.set_opacity(opacity_fn)
+
+        return clip
 
     def _apply_text_animation(self, clip, animation: Dict[str, Any], fps: float):
         """

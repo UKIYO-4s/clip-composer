@@ -254,6 +254,16 @@ function ExportDialog() {
       randomLayers: randomLayers, // ランダムレイヤー共有リソース
     };
 
+    // デバッグ: テキスト系クリップのfontFamily確認
+    console.log('[ExportDialog] テキストクリップのfontFamily確認:');
+    Object.entries(timeline.layers).forEach(([layerName, layer]) => {
+      layer.clips.forEach((clip) => {
+        if (['text', 'variable_text', 'csv_text_placeholder'].includes(clip.type)) {
+          console.log(`  [${layerName}] type=${clip.type} fontFamily=${clip.fontFamily} text=${clip.textContent || clip.template || clip.csvColumnName}`);
+        }
+      });
+    });
+
     const options = {
       resolution: [resolution.width, resolution.height],
       fps: projectFps,
@@ -317,6 +327,16 @@ function ExportDialog() {
       layerOrder: timeline.layerOrder,
       randomLayers: randomLayers, // ランダムレイヤー共有リソース
     };
+
+    // デバッグ: テキスト系クリップのfontFamily確認（バッチ処理）
+    console.log('[ExportDialog:Batch] テキストクリップのfontFamily確認:');
+    Object.entries(timeline.layers).forEach(([layerName, layer]) => {
+      layer.clips.forEach((clip) => {
+        if (['text', 'variable_text', 'csv_text_placeholder'].includes(clip.type)) {
+          console.log(`  [${layerName}] type=${clip.type} fontFamily=${clip.fontFamily} text=${clip.textContent || clip.template || clip.csvColumnName}`);
+        }
+      });
+    });
 
     const options = {
       resolution: [resolution.width, resolution.height],

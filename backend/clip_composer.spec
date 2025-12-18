@@ -32,6 +32,10 @@ hidden_imports = [
     'json',
     'sys',
     'os',
+    # フォント処理用
+    'fontTools',
+    'fontTools.ttLib',
+    'fontTools.misc',
 ]
 
 # MoviePyのサブモジュールを収集
