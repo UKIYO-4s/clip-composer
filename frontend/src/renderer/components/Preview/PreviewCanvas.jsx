@@ -82,17 +82,91 @@ function PreviewCanvas() {
     });
   }, [getVisibleClips, mediaReady]);
 
+  // イージング関数
+  const easing = {
+    linear: (t) => t,
+    ease_in: (t) => t * t,
+    ease_out: (t) => t * (2 - t),
+    ease_in_out: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+  };
+
+  // エンベロープ値を計算（0-1の範囲でopacity/scaleなどに適用）
+  const calculateEnvelopeValue = (clip, relativeFrame) => {
+    const envelope = clip.envelope;
+    if (!envelope) return 1.0;
+
+    const duration = clip.durationFrames;
+    const inEnv = envelope.in;
+    const outEnv = envelope.out;
+
+    let value = 1.0;
+
+    // IN効果（開始時）
+    if (inEnv && inEnv.type !== 'none' && relativeFrame < inEnv.duration_frames) {
+      const t = relativeFrame / inEnv.duration_frames;
+      const easedT = easing[inEnv.easing]?.(t) ?? t;
+      value *= easedT;
+    }
+
+    // OUT効果（終了時）
+    if (outEnv && outEnv.type !== 'none') {
+      const outStart = duration - outEnv.duration_frames;
+      if (relativeFrame >= outStart) {
+        const t = 1 - (relativeFrame - outStart) / outEnv.duration_frames;
+        const easedT = easing[outEnv.easing]?.(t) ?? t;
+        value *= easedT;
+      }
+    }
+
+    return Math.max(0, Math.min(1, value));
+  };
+
+  // 現在のフレームに対応するセグメントを取得
+  const getCurrentSegment = (clip, relativeFrame) => {
+    if (!clip.segments || clip.segments.length === 0) {
+      return null;
+    }
+
+    // relativeFrameが含まれるセグメントを検索
+    for (const segment of clip.segments) {
+      const segmentEnd = segment.startOffset + segment.duration;
+      if (relativeFrame >= segment.startOffset && relativeFrame < segmentEnd) {
+        return segment;
+      }
+    }
+
+    // ギャップ期間ならnullを返す（何も描画しない）
+    return null;
+  };
+
   // メディアを描画（変形適用）
-  const drawMedia = (ctx, media, clip, width, height) => {
+  const drawMedia = (ctx, media, clip, width, height, envelopeValue = 1.0) => {
     ctx.save();
 
     // 変形パラメータ
-    const scale = (clip.scale || 100) / 100;
-    const opacity = (clip.opacity ?? 100) / 100;
+    const baseScale = (clip.scale || 100) / 100;
+    const baseOpacity = (clip.opacity ?? 100) / 100;
     const rotation = (clip.rotation || 0) * Math.PI / 180;
     const posX = clip.positionX || 0;
     const posY = clip.positionY || 0;
     const fitMode = clip.fit || 'contain';
+
+    // envelopeタイプに応じた適用
+    const envelope = clip.envelope;
+    const inType = envelope?.in?.type || 'none';
+    const outType = envelope?.out?.type || 'none';
+
+    // フェード: opacity に適用
+    // スケール: scale に適用
+    let opacity = baseOpacity;
+    let scale = baseScale;
+
+    if (inType === 'fade' || outType === 'fade') {
+      opacity *= envelopeValue;
+    }
+    if (inType === 'scale' || outType === 'scale') {
+      scale *= envelopeValue;
+    }
 
     ctx.globalAlpha = opacity;
 
@@ -261,27 +335,48 @@ function PreviewCanvas() {
     const renderClips = async () => {
       for (const clip of visibleClips) {
         const filePath = clip.filePath || clip.selectedFilePath;
+        const relativeFrame = currentFrame - clip.startFrame;
 
-        if (clip.type === 'image' || (clip.type === 'random_layer' && filePath)) {
+        // envelope値を計算（random_layer用、他のタイプでも将来使用可能）
+        const envelopeValue = calculateEnvelopeValue(clip, relativeFrame);
+
+        if (clip.type === 'random_layer') {
+          // ランダムレイヤー（ネスト型コンテナ）の描画
+          // 現在のフレームに対応するセグメントを取得
+          const currentSegment = getCurrentSegment(clip, relativeFrame);
+
+          if (filePath) {
+            // 旧形式または単一セグメント: filePathで直接描画
+            try {
+              const img = await loadImage(filePath);
+              drawMedia(ctx, img, clip, width, height, envelopeValue);
+            } catch (e) {
+              drawPlaceholder(ctx, clip, width, height, '#22C55E');
+            }
+          } else if (currentSegment) {
+            // 新形式: セグメントに基づいて描画（プレースホルダー表示）
+            // 実際のアセット選択はエクスポート時にrandomLayerSliceで行う
+            drawPlaceholder(ctx, clip, width, height, '#22C55E');
+          } else {
+            // ギャップ期間: 何も描画しない
+            continue;
+          }
+        } else if (clip.type === 'image') {
           // 画像クリップの描画
           try {
             const img = await loadImage(filePath);
-            drawMedia(ctx, img, clip, width, height);
+            drawMedia(ctx, img, clip, width, height, envelopeValue);
           } catch (e) {
-            // 画像が読み込めない場合はプレースホルダー
             drawPlaceholder(ctx, clip, width, height, '#22C55E');
           }
         } else if (clip.type === 'video' && filePath) {
           // 動画クリップの描画
           try {
             const video = await getVideoElement(filePath);
-            // クリップ内の相対フレームから時間を計算
-            const relativeFrame = currentFrame - clip.startFrame;
             const timeInSeconds = relativeFrame / fps;
             await seekVideoToTime(video, timeInSeconds);
-            drawMedia(ctx, video, clip, width, height);
+            drawMedia(ctx, video, clip, width, height, envelopeValue);
           } catch (e) {
-            // 動画が読み込めない場合はプレースホルダー
             drawPlaceholder(ctx, clip, width, height, '#3B82F6');
           }
         } else if (clip.type === 'text' || clip.type === 'variable_text' || clip.type === 'csv_text_placeholder') {

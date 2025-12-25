@@ -27,11 +27,10 @@ export default {
     'assets/**/*',
   ],
   extraResources: [
-    // PyInstallerでビルドされたPythonバックエンド
+    // PyInstallerでビルドされたPythonバックエンド（onefileモード）
     {
       from: 'backend/dist/clip_composer_backend',
       to: 'backend/clip_composer_backend',
-      filter: ['**/*'],
     },
     // フォールバック用: Pythonソースファイル（システムPythonで実行用）
     {
@@ -60,7 +59,8 @@ export default {
     target: [
       {
         target: 'dmg',
-        arch: ['x64', 'arm64'], // Intel Mac + Apple Silicon両対応
+        // ビルド時に --arch オプションで指定（例: --arch arm64 または --arch x64）
+        // 指定しない場合は現在のマシンのアーキテクチャでビルド
       },
     ],
     fileAssociations: [

@@ -57,11 +57,15 @@ import { updateClip } from './store/timelineSlice';
  * - randomLayerIdを持たないrandom_layerクリップを検出
  * - folderPathでグループ化し、共有リソースとして登録
  * - 各クリップにrandomLayerIdを付与
+ * - 旧形式（segmentsなし）を新形式（segments + envelope）に移行
  */
 const migrateRandomLayerClips = (layers, existingRandomLayers = []) => {
-  const clipUpdates = []; // { layerId, clipId, randomLayerId }
+  const clipUpdates = []; // { layerId, clipId, updates }
   const newRandomLayers = []; // 新規作成するランダムレイヤー
   const folderToLayerIdMap = new Map(); // folderPath → randomLayerId のマップ
+
+  // セグメントID生成
+  const generateSegmentId = () => `segment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   // 既存のrandomLayersをマップに登録
   existingRandomLayers.forEach(rl => {
@@ -77,40 +81,68 @@ const migrateRandomLayerClips = (layers, existingRandomLayers = []) => {
     layer.clips.forEach(clip => {
       if (clip.type !== 'random_layer') return;
 
-      // 既にrandomLayerIdがあり、対応するrandomLayerが存在する場合はスキップ
-      if (clip.randomLayerId) {
-        const exists = existingRandomLayers.some(rl => rl.id === clip.randomLayerId) ||
-                       newRandomLayers.some(rl => rl.id === clip.randomLayerId);
-        if (exists) return;
+      const updates = {};
+      let needsUpdate = false;
+
+      // 1. randomLayerId の移行処理
+      if (!clip.randomLayerId || !existingRandomLayers.some(rl => rl.id === clip.randomLayerId)) {
+        // folderPathがある場合のみrandomLayerを作成
+        if (clip.folderPath) {
+          let randomLayerId = folderToLayerIdMap.get(clip.folderPath);
+
+          if (!randomLayerId) {
+            // 新しいrandomLayerを作成
+            randomLayerId = `random-layer-migrated-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const folderName = clip.folderPath.split('/').pop() || 'ランダム素材';
+
+            newRandomLayers.push({
+              id: randomLayerId,
+              name: `${folderName}`,
+              folderPath: clip.folderPath,
+              assets: [], // 後でリフレッシュ可能
+            });
+
+            folderToLayerIdMap.set(clip.folderPath, randomLayerId);
+          }
+
+          updates.randomLayerId = randomLayerId;
+          needsUpdate = true;
+        }
       }
 
-      // folderPathがない場合はスキップ
-      if (!clip.folderPath) return;
+      // 2. segments 構造の移行（旧形式 → 新形式）
+      if (!clip.segments || !Array.isArray(clip.segments) || clip.segments.length === 0) {
+        // 旧形式: segmentsがない → 単一セグメントとしてラップ
+        const randomLayerIdForSegment = updates.randomLayerId || clip.randomLayerId || null;
 
-      // 同じfolderPathのrandomLayerがあるか確認
-      let randomLayerId = folderToLayerIdMap.get(clip.folderPath);
-
-      if (!randomLayerId) {
-        // 新しいrandomLayerを作成
-        randomLayerId = `random-layer-migrated-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        const folderName = clip.folderPath.split('/').pop() || 'ランダム素材';
-
-        newRandomLayers.push({
-          id: randomLayerId,
-          name: `${folderName}`,
-          folderPath: clip.folderPath,
-          assets: [], // 後でリフレッシュ可能
-        });
-
-        folderToLayerIdMap.set(clip.folderPath, randomLayerId);
+        updates.segments = [{
+          id: generateSegmentId(),
+          startOffset: 0,
+          duration: clip.durationFrames || 30,
+          randomLayerId: randomLayerIdForSegment,
+          assetId: null,
+          fit: null, // 親（コンテナ）から継承
+          audioGain: 1.0,
+          speed: 1.0,
+        }];
+        needsUpdate = true;
       }
 
-      // クリップにrandomLayerIdがない、または対応するrandomLayerが存在しない場合は更新
-      if (clip.randomLayerId !== randomLayerId) {
+      // 3. envelope 構造の追加（なければデフォルト作成）
+      if (!clip.envelope) {
+        updates.envelope = {
+          in: { type: 'none', duration_frames: 6, easing: 'ease_in_out' },
+          out: { type: 'none', duration_frames: 6, easing: 'ease_in_out' },
+        };
+        needsUpdate = true;
+      }
+
+      // 更新が必要な場合のみキューに追加
+      if (needsUpdate) {
         clipUpdates.push({
           layerId,
           clipId: clip.id,
-          randomLayerId,
+          updates,
         });
       }
     });
@@ -346,17 +378,17 @@ function App() {
           dispatch(createRandomLayer(rl));
         });
 
-        // クリップにrandomLayerIdを付与
-        clipUpdates.forEach(({ layerId, clipId, randomLayerId }) => {
+        // クリップを新構造に移行（randomLayerId, segments, envelope）
+        clipUpdates.forEach(({ layerId, clipId, updates }) => {
           dispatch(updateClip({
             layerId,
             clipId,
-            updates: { randomLayerId },
+            updates,
           }));
         });
 
         if (newRandomLayers.length > 0 || clipUpdates.length > 0) {
-          console.log(`Migrated ${clipUpdates.length} clips, created ${newRandomLayers.length} random layers`);
+          console.log(`Migrated ${clipUpdates.length} random_layer clips to nested container structure, created ${newRandomLayers.length} random layers`);
         }
       }
 
@@ -483,17 +515,17 @@ function App() {
           dispatch(createRandomLayer(rl));
         });
 
-        // クリップにrandomLayerIdを付与
-        clipUpdates.forEach(({ layerId, clipId, randomLayerId }) => {
+        // クリップを新構造に移行（randomLayerId, segments, envelope）
+        clipUpdates.forEach(({ layerId, clipId, updates }) => {
           dispatch(updateClip({
             layerId,
             clipId,
-            updates: { randomLayerId },
+            updates,
           }));
         });
 
         if (newRandomLayers.length > 0 || clipUpdates.length > 0) {
-          console.log(`Migrated ${clipUpdates.length} clips, created ${newRandomLayers.length} random layers`);
+          console.log(`Migrated ${clipUpdates.length} random_layer clips to nested container structure, created ${newRandomLayers.length} random layers`);
         }
       }
 

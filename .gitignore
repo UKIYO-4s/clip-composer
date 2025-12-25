@@ -40,7 +40,12 @@ backend/__pycache__/
 # Backend temporary/test files
 backend/tmp_*
 backend/test_output.mp4
-backend/clip_composer_backend.spec
+backend/build/
+backend/dist/
+
+# FFmpeg binaries (download via scripts/download-ffmpeg.sh)
+assets/bin/ffmpeg
+assets/bin/ffprobe
 
 # Icon build intermediate
 assets/icon.iconset/

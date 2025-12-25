@@ -157,6 +157,55 @@ const BulkPlacementDialog = ({ isOpen, onClose }) => {
 
   // 新規作成実行
   const handleCreate = useCallback(() => {
+    // random_layerはネスト型コンテナとして1本にまとめる
+    if (clipType === 'random_layer') {
+      const segments = [];
+      let currentOffset = 0;
+      for (let i = 0; i < clipCount; i++) {
+        segments.push({
+          id: `segment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          startOffset: currentOffset,
+          duration: clipDuration,
+          randomLayerId: null,
+          assetId: null,
+          fit: null,
+          audioGain: 1.0,
+          speed: 1.0,
+        });
+        currentOffset += clipDuration + gap;
+      }
+
+      const totalDuration = currentOffset - gap; // 最後のギャップは外す
+
+      const clipData = {
+        id: generateId(),
+        type: 'random_layer',
+        name: `${clipTypeOptions.find(t => t.value === clipType)?.label || clipType} コンテナ`,
+        startFrame,
+        durationFrames: totalDuration,
+        opacity: 100,
+        scale: 100,
+        positionX: 0,
+        positionY: 0,
+        rotation: 0,
+        fit: 'contain',
+        folderPath: folderPath,
+        selectionMode: 'random',
+        extensions: '.mp4,.mov,.avi',
+        fileLimit: 0,
+        envelope: {
+          in: { type: 'none', duration_frames: 6, easing: 'ease_in_out' },
+          out: { type: 'none', duration_frames: 6, easing: 'ease_in_out' },
+        },
+        segments,
+      };
+
+      dispatch(saveToHistory());
+      dispatch(addClip({ layerId: targetLayer, clip: clipData }));
+      onClose();
+      return;
+    }
+
     let currentFramePos = startFrame;
     const newClips = [];
 
@@ -174,13 +223,6 @@ const BulkPlacementDialog = ({ isOpen, onClose }) => {
         rotation: 0,
         fit: 'contain',
       };
-
-      if (clipType === 'random_layer') {
-        clipData.folderPath = folderPath;
-        clipData.selectionMode = 'random';
-        clipData.extensions = '.mp4,.mov,.avi';
-        clipData.fileLimit = 0;
-      }
 
       newClips.push(clipData);
       currentFramePos += clipDuration + gap;

@@ -6,6 +6,7 @@ import { ChevronDown, Settings } from '../Icons';
 import { Input, Button } from '../ui';
 import EffectSection from './EffectSection';
 import FontSelector from '../FontSelector/FontSelector';
+import RandomLayerContainerSettings from './RandomLayerContainerSettings';
 
 // アコーディオンセクションコンポーネント
 const Section = ({ title, children, defaultOpen = true }) => {
@@ -759,7 +760,7 @@ const PropertyPanel = () => {
 
       {/* プレビューオーバーレイ設定（random_layer用） */}
       {clip.type === 'random_layer' && (
-        <Section title="プレビュー表示" defaultOpen={true}>
+        <Section title="プレビュー表示" defaultOpen={false}>
           <Field label="オーバーレイ色">
             <div className="flex items-center gap-2">
               <input
@@ -790,30 +791,14 @@ const PropertyPanel = () => {
         </Section>
       )}
 
-      {/* ランダムレイヤー管理（random_layer用） */}
+      {/* ネスト型コンテナ設定（random_layer用） */}
       {clip.type === 'random_layer' && (
-        <Section title="ランダムレイヤー" defaultOpen={true}>
-          <div className="space-y-2">
-            <Field label="フォルダパス">
-              <p className="text-xs text-ink-secondary truncate" title={clip.folderPath}>
-                {clip.folderPath || '(未設定)'}
-              </p>
-            </Field>
-            {clip.randomLayerId && (
-              <p className="text-xs text-ink-muted">
-                共有ID: {clip.randomLayerId.slice(-8)}
-              </p>
-            )}
-            <Button
-              variant="subtle"
-              size="sm"
-              onClick={() => dispatch(openRandomLayerPanel())}
-              className="w-full flex items-center justify-center gap-1"
-            >
-              <Settings className="w-3 h-3" />
-              ランダムレイヤー管理
-            </Button>
-          </div>
+        <Section title="コンテナ・セグメント設定" defaultOpen={true}>
+          <RandomLayerContainerSettings
+            clip={clip}
+            layerId={layerId}
+            onUpdate={handleUpdate}
+          />
         </Section>
       )}
 

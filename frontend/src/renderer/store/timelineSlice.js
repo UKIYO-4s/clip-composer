@@ -2,6 +2,26 @@ import { createSlice, createSelector } from '@reduxjs/toolkit';
 
 // ユニークID生成
 const generateId = () => `clip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const generateSegmentId = () => `segment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+// デフォルトのenvelope構造
+const createDefaultEnvelope = () => ({
+  in: { type: 'none', duration_frames: 6, easing: 'ease_in_out' },
+  out: { type: 'none', duration_frames: 6, easing: 'ease_in_out' },
+});
+
+// デフォルトのsegment構造
+const createDefaultSegment = (overrides = {}) => ({
+  id: generateSegmentId(),
+  startOffset: 0,
+  duration: 30,
+  randomLayerId: null,
+  assetId: null,
+  fit: null,
+  audioGain: 1.0,
+  speed: 1.0,
+  ...overrides,
+});
 
 // テスト用サンプルクリップ
 const sampleClips = {
@@ -879,6 +899,186 @@ const timelineSlice = createSlice({
       state.historyIndex = -1;
       state.showNewProjectDialog = false;
     },
+
+    // ========================================
+    // セグメント操作（ネスト型コンテナ用）
+    // ========================================
+
+    // セグメント追加
+    addSegment: (state, action) => {
+      const { layerId, clipId, segment: segmentData } = action.payload;
+      const clip = state.layers[layerId]?.clips.find(c => c.id === clipId);
+      if (!clip || clip.type !== 'random_layer') return;
+
+      // segments配列がなければ作成
+      if (!clip.segments) {
+        clip.segments = [];
+      }
+
+      const newSegment = createDefaultSegment(segmentData);
+      clip.segments.push(newSegment);
+
+      // startOffsetでソート
+      clip.segments.sort((a, b) => a.startOffset - b.startOffset);
+    },
+
+    // セグメント削除
+    removeSegment: (state, action) => {
+      const { layerId, clipId, segmentId } = action.payload;
+      const clip = state.layers[layerId]?.clips.find(c => c.id === clipId);
+      if (!clip || !clip.segments) return;
+
+      clip.segments = clip.segments.filter(s => s.id !== segmentId);
+    },
+
+    // セグメント更新
+    updateSegment: (state, action) => {
+      const { layerId, clipId, segmentId, updates } = action.payload;
+      const clip = state.layers[layerId]?.clips.find(c => c.id === clipId);
+      if (!clip || !clip.segments) return;
+
+      const segment = clip.segments.find(s => s.id === segmentId);
+      if (segment) {
+        Object.assign(segment, updates);
+        // startOffsetでソート
+        clip.segments.sort((a, b) => a.startOffset - b.startOffset);
+      }
+    },
+
+    // セグメント分割
+    splitSegment: (state, action) => {
+      const { layerId, clipId, segmentId, splitOffset } = action.payload;
+      const clip = state.layers[layerId]?.clips.find(c => c.id === clipId);
+      if (!clip || !clip.segments) return;
+
+      const segmentIndex = clip.segments.findIndex(s => s.id === segmentId);
+      if (segmentIndex === -1) return;
+
+      const segment = clip.segments[segmentIndex];
+      const segmentEnd = segment.startOffset + segment.duration;
+
+      // 分割位置がセグメント範囲内かチェック
+      if (splitOffset <= segment.startOffset || splitOffset >= segmentEnd) return;
+
+      // 前半の長さを調整
+      const firstHalfDuration = splitOffset - segment.startOffset;
+
+      // 後半セグメントを作成
+      const secondHalf = createDefaultSegment({
+        startOffset: splitOffset,
+        duration: segmentEnd - splitOffset,
+        randomLayerId: segment.randomLayerId,
+        assetId: segment.assetId,
+        fit: segment.fit,
+        audioGain: segment.audioGain,
+        speed: segment.speed,
+      });
+
+      // 前半の長さを更新
+      segment.duration = firstHalfDuration;
+
+      // 後半を挿入
+      clip.segments.splice(segmentIndex + 1, 0, secondHalf);
+    },
+
+    // セグメント並び替え
+    reorderSegments: (state, action) => {
+      const { layerId, clipId, segmentIds } = action.payload;
+      const clip = state.layers[layerId]?.clips.find(c => c.id === clipId);
+      if (!clip || !clip.segments) return;
+
+      // 新しい順序に基づいてstartOffsetを再計算
+      const segmentMap = new Map(clip.segments.map(s => [s.id, s]));
+      let currentOffset = 0;
+
+      const reorderedSegments = segmentIds.map(id => {
+        const segment = segmentMap.get(id);
+        if (segment) {
+          segment.startOffset = currentOffset;
+          currentOffset += segment.duration;
+          return segment;
+        }
+        return null;
+      }).filter(Boolean);
+
+      clip.segments = reorderedSegments;
+    },
+
+    // エンベロープ更新
+    updateEnvelope: (state, action) => {
+      const { layerId, clipId, envelope } = action.payload;
+      const clip = state.layers[layerId]?.clips.find(c => c.id === clipId);
+      if (!clip) return;
+
+      // envelopeがなければデフォルト作成
+      if (!clip.envelope) {
+        clip.envelope = createDefaultEnvelope();
+      }
+
+      // in/outの部分更新をサポート
+      if (envelope.in) {
+        clip.envelope.in = { ...clip.envelope.in, ...envelope.in };
+      }
+      if (envelope.out) {
+        clip.envelope.out = { ...clip.envelope.out, ...envelope.out };
+      }
+    },
+
+    // セグメントを等間隔に分割（一括配置用）
+    splitSegmentsEvenly: (state, action) => {
+      const { layerId, clipId, count } = action.payload;
+      const clip = state.layers[layerId]?.clips.find(c => c.id === clipId);
+      if (!clip || clip.type !== 'random_layer') return;
+
+      // セグメントを等間隔に分割
+      const segmentDuration = Math.floor(clip.durationFrames / count);
+      const newSegments = [];
+
+      for (let i = 0; i < count; i++) {
+        const isLast = i === count - 1;
+        const duration = isLast
+          ? clip.durationFrames - (segmentDuration * i)
+          : segmentDuration;
+
+        newSegments.push(createDefaultSegment({
+          startOffset: segmentDuration * i,
+          duration,
+          randomLayerId: clip.randomLayerId || null,
+        }));
+      }
+
+      clip.segments = newSegments;
+    },
+
+    // コンテナの長さに合わせてセグメントを調整
+    fitSegmentsToContainer: (state, action) => {
+      const { layerId, clipId } = action.payload;
+      const clip = state.layers[layerId]?.clips.find(c => c.id === clipId);
+      if (!clip || !clip.segments || clip.segments.length === 0) return;
+
+      // 最後のセグメントをコンテナの終端に合わせる
+      const lastSegment = clip.segments[clip.segments.length - 1];
+      const lastSegmentEnd = lastSegment.startOffset + lastSegment.duration;
+      const containerEnd = clip.durationFrames;
+
+      if (lastSegmentEnd < containerEnd) {
+        // 足りない分を最後のセグメントに追加
+        lastSegment.duration += (containerEnd - lastSegmentEnd);
+      } else if (lastSegmentEnd > containerEnd) {
+        // はみ出した分を削除（セグメントを切り詰め/削除）
+        let currentOffset = 0;
+        clip.segments = clip.segments.filter(segment => {
+          const segmentEnd = segment.startOffset + segment.duration;
+          if (segment.startOffset >= containerEnd) {
+            return false; // 完全にはみ出しているので削除
+          }
+          if (segmentEnd > containerEnd) {
+            segment.duration = containerEnd - segment.startOffset;
+          }
+          return true;
+        });
+      }
+    },
   },
 });
 
@@ -928,6 +1128,15 @@ export const {
   pasteClips,
   selectAllClips,
   loadTimeline,
+  // セグメント操作（ネスト型コンテナ用）
+  addSegment,
+  removeSegment,
+  updateSegment,
+  splitSegment,
+  reorderSegments,
+  updateEnvelope,
+  splitSegmentsEvenly,
+  fitSegmentsToContainer,
 } = timelineSlice.actions;
 
 export default timelineSlice.reducer;

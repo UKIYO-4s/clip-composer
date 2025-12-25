@@ -294,41 +294,60 @@ const RandomLayerBulkDialog = ({ isOpen, onClose }) => {
     // 履歴に保存
     dispatch(saveToHistory());
 
-    let currentFramePos = calculateStartFrame();
+    const startFrame = calculateStartFrame();
     const gap = placementMode === 'continuous' ? 0 : gapFrames;
 
-    // クリップ名を素材タイプに応じて変更
-    const clipNamePrefix = mediaType === 'video_only' ? 'ランダムビデオ' :
-                          mediaType === 'image_only' ? 'ランダム画像' : 'ランダムメディア';
-
+    // コンテナ長とセグメント配列を生成（1本のrandom_layerコンテナにネスト）
+    const segments = [];
+    let currentOffset = 0;
     for (let i = 0; i < calculated.clipCount; i++) {
-      const clipData = {
-        id: generateId(),
-        type: 'random_layer',
-        name: `${clipNamePrefix} ${i + 1}`,
-        startFrame: currentFramePos,
-        durationFrames: calculated.clipDurationFrames,
-        opacity: 100,
-        // 位置・スケール（scaleはパーセント値のまま保存、レンダラーが100で割る）
-        positionX: positionX,
-        positionY: positionY,
-        scale: scale,
-        folderPath: folderPath,
-        selectionMode: selectionMode,
-        // 素材タイプ関連（新規）
-        mediaType: mediaType,
-        includeGif: includeGif,
-        extensions: currentExtensions.join(','),
-        fileLimit: 0,
-        randomSeed: Math.random(),
-        // プレビュー色（パレットから順番に割り当て）
-        previewColor: PREVIEW_COLORS[i % PREVIEW_COLORS.length],
-      };
-
-      dispatch(addClip({ layerId: targetLayer, clip: clipData, skipOverlapCheck: true }));
-
-      currentFramePos += calculated.clipDurationFrames + gap;
+      const clipDuration = calculated.clipDurationFrames;
+      segments.push({
+        id: `segment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        startOffset: currentOffset,
+        duration: clipDuration,
+        randomLayerId: null,
+        assetId: null,
+        fit: null,
+        audioGain: 1.0,
+        speed: 1.0,
+      });
+      currentOffset += clipDuration + gap;
     }
+
+    const totalDuration = currentOffset - gap; // 最後のギャップは外す
+
+    const clipData = {
+      id: generateId(),
+      type: 'random_layer',
+      name: mediaType === 'video_only'
+        ? 'ランダムビデオコンテナ'
+        : mediaType === 'image_only'
+          ? 'ランダム画像コンテナ'
+          : 'ランダムメディアコンテナ',
+      startFrame: startFrame,
+      durationFrames: totalDuration,
+      opacity: 100,
+      positionX: positionX,
+      positionY: positionY,
+      scale: scale,
+      fit: 'contain',
+      folderPath: folderPath,
+      selectionMode: selectionMode,
+      mediaType: mediaType,
+      includeGif: includeGif,
+      extensions: currentExtensions.join(','),
+      fileLimit: 0,
+      randomSeed: Math.random(),
+      previewColor: PREVIEW_COLORS[0],
+      envelope: {
+        in: { type: 'none', duration_frames: 6, easing: 'ease_in_out' },
+        out: { type: 'none', duration_frames: 6, easing: 'ease_in_out' },
+      },
+      segments,
+    };
+
+    dispatch(addClip({ layerId: targetLayer, clip: clipData, skipOverlapCheck: true }));
 
     onClose();
   }, [dispatch, calculateStartFrame, calculated, placementMode, gapFrames, targetLayer, folderPath, selectionMode, mediaType, includeGif, currentExtensions, positionX, positionY, scale, onClose, validateInputs]);
