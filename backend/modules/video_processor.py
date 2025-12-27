@@ -75,6 +75,12 @@ try:
 except ImportError:
     FFMPEG_FILTERS_AVAILABLE = False
     print("Warning: FFmpegFilters not available.")
+try:
+    from .effects.easing import get_easing
+    EASING_AVAILABLE = True
+except ImportError:
+    EASING_AVAILABLE = False
+    print("Warning: Easing functions not available.")
 
 
 class VideoProcessor:
@@ -834,12 +840,41 @@ class VideoProcessor:
         else:
             fit_scale = 1.0
 
+        # キーフレーム（透明度/スケール）
+        transform_keyframes = clip_data.get('transformKeyframes') or {}
+        scale_keyframe = transform_keyframes.get('scale') or {}
+        opacity_keyframe = transform_keyframes.get('opacity') or {}
+        clip_duration = getattr(clip, 'duration', 0) or 0
+
+        def get_eased_progress(t, duration, easing_name, bezier):
+            if duration <= 0:
+                return 0.0
+            progress = max(0.0, min(1.0, t / duration))
+            if EASING_AVAILABLE:
+                easing_func = get_easing(easing_name, bezier)
+                return easing_func(progress)
+            return progress
+
         # スケール（フロントエンドから0-400%で送られるため100で割る）
         # fitモード適用後のサイズに対する追加スケール
         scale_raw = clip_data.get('scale', 100)
-        scale = max(0.01, scale_raw / 100.0)  # 100% -> 1.0
-        if scale != 1.0:
-            clip = clip.resize(scale)
+        scale_keyframe_enabled = bool(scale_keyframe.get('enabled'))
+        if scale_keyframe_enabled:
+            start_scale = scale_keyframe.get('start', scale_raw)
+            end_scale = scale_keyframe.get('end', scale_raw)
+            easing_name = scale_keyframe.get('easing', 'linear')
+            bezier = scale_keyframe.get('bezier')
+
+            def scale_func(t):
+                eased = get_eased_progress(t, clip_duration, easing_name, bezier)
+                value = start_scale + (end_scale - start_scale) * eased
+                return max(0.01, value / 100.0)
+
+            clip = clip.resize(scale_func)
+        else:
+            scale = max(0.01, scale_raw / 100.0)  # 100% -> 1.0
+            if scale != 1.0:
+                clip = clip.resize(scale)
 
         # 回転
         rotation = clip_data.get('rotation', 0)
@@ -848,9 +883,23 @@ class VideoProcessor:
 
         # 不透明度（フロントエンドから0-100%で送られるため100で割る）
         opacity_raw = clip_data.get('opacity', 100)
-        opacity = max(0.0, min(1.0, opacity_raw / 100.0))  # 100% -> 1.0
-        if opacity != 1.0:
-            clip = clip.set_opacity(opacity)
+        opacity_keyframe_enabled = bool(opacity_keyframe.get('enabled'))
+        if opacity_keyframe_enabled:
+            start_opacity = opacity_keyframe.get('start', opacity_raw)
+            end_opacity = opacity_keyframe.get('end', opacity_raw)
+            easing_name = opacity_keyframe.get('easing', 'linear')
+            bezier = opacity_keyframe.get('bezier')
+
+            def opacity_func(t):
+                eased = get_eased_progress(t, clip_duration, easing_name, bezier)
+                value = start_opacity + (end_opacity - start_opacity) * eased
+                return max(0.0, min(1.0, value / 100.0))
+
+            clip = clip.set_opacity(opacity_func)
+        else:
+            opacity = max(0.0, min(1.0, opacity_raw / 100.0))  # 100% -> 1.0
+            if opacity != 1.0:
+                clip = clip.set_opacity(opacity)
 
         # 位置（中心基準から左上基準に変換）
         # フロントエンドは中心基準、MoviePyは左上基準

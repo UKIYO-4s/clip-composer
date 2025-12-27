@@ -247,17 +247,51 @@ EASING_PRESETS: dict[str, Callable[[float], float]] = {
 }
 
 
-def get_easing(name: str) -> Callable[[float], float]:
+def _parse_cubic_bezier(name: str) -> tuple[float, float, float, float] | None:
+    """
+    cubic-bezier(x1, y1, x2, y2) 文字列をパース
+    """
+    if not name:
+        return None
+    prefix = "cubic-bezier("
+    if not name.startswith(prefix) or not name.endswith(")"):
+        return None
+    content = name[len(prefix):-1]
+    parts = [p.strip() for p in content.split(",")]
+    if len(parts) != 4:
+        return None
+    try:
+        return (float(parts[0]), float(parts[1]), float(parts[2]), float(parts[3]))
+    except ValueError:
+        return None
+
+
+def get_easing(name: str, bezier: list[float] | tuple[float, float, float, float] | None = None) -> Callable[[float], float]:
     """
     名前からイージング関数を取得
 
     Args:
         name: イージング名 (例: 'ease-in', 'ease-out', 'linear')
+        bezier: cubic-bezier 用の制御点 (x1, y1, x2, y2)
 
     Returns:
         イージング関数（見つからない場合はlinear）
     """
-    return EASING_PRESETS.get(name, linear)
+    if not name:
+        return linear
+
+    normalized = name.replace("_", "-")
+
+    if normalized == "cubic-bezier":
+        if bezier and len(bezier) == 4:
+            return create_cubic_bezier(bezier[0], bezier[1], bezier[2], bezier[3])
+        return linear
+
+    parsed = _parse_cubic_bezier(normalized)
+    if parsed:
+        return create_cubic_bezier(parsed[0], parsed[1], parsed[2], parsed[3])
+
+    return EASING_PRESETS.get(normalized, linear)
 
 
 # =============================================================================

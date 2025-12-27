@@ -83,11 +83,51 @@ function PreviewCanvas() {
   }, [getVisibleClips, mediaReady]);
 
   // イージング関数
-  const easing = {
+  const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
+
+  const cubicBezier = (t, p1, p2, p3, p4) => {
+    const u = 1 - t;
+    const tt = t * t;
+    const uu = u * u;
+    const uuu = uu * u;
+    const ttt = tt * t;
+    let y = uuu * 0;
+    y += 3 * uu * t * p2;
+    y += 3 * u * tt * p4;
+    y += ttt * 1;
+    return y;
+  };
+
+  const parseCubicBezier = (name) => {
+    if (!name) return null;
+    const prefix = 'cubic-bezier(';
+    if (!name.startsWith(prefix) || !name.endsWith(')')) return null;
+    const content = name.slice(prefix.length, -1);
+    const parts = content.split(',').map((p) => p.trim());
+    if (parts.length !== 4) return null;
+    const nums = parts.map((p) => parseFloat(p));
+    if (nums.some((n) => Number.isNaN(n))) return null;
+    return nums;
+  };
+
+  const easingPresets = {
     linear: (t) => t,
-    ease_in: (t) => t * t,
-    ease_out: (t) => t * (2 - t),
-    ease_in_out: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+    'ease-in': (t) => t * t,
+    'ease-out': (t) => t * (2 - t),
+    'ease-in-out': (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
+  };
+
+  const getEasingFn = (name, bezier) => {
+    if (!name) return easingPresets.linear;
+    const normalized = name.replace('_', '-');
+    if (normalized === 'cubic-bezier' && Array.isArray(bezier) && bezier.length === 4) {
+      return (t) => cubicBezier(clamp(t), bezier[0], bezier[1], bezier[2], bezier[3]);
+    }
+    const parsed = parseCubicBezier(normalized);
+    if (parsed) {
+      return (t) => cubicBezier(clamp(t), parsed[0], parsed[1], parsed[2], parsed[3]);
+    }
+    return easingPresets[normalized] || easingPresets.linear;
   };
 
   // エンベロープ値を計算（0-1の範囲でopacity/scaleなどに適用）
@@ -104,7 +144,7 @@ function PreviewCanvas() {
     // IN効果（開始時）
     if (inEnv && inEnv.type !== 'none' && relativeFrame < inEnv.duration_frames) {
       const t = relativeFrame / inEnv.duration_frames;
-      const easedT = easing[inEnv.easing]?.(t) ?? t;
+      const easedT = getEasingFn(inEnv.easing)(t);
       value *= easedT;
     }
 
@@ -113,7 +153,7 @@ function PreviewCanvas() {
       const outStart = duration - outEnv.duration_frames;
       if (relativeFrame >= outStart) {
         const t = 1 - (relativeFrame - outStart) / outEnv.duration_frames;
-        const easedT = easing[outEnv.easing]?.(t) ?? t;
+        const easedT = getEasingFn(outEnv.easing)(t);
         value *= easedT;
       }
     }
@@ -140,12 +180,43 @@ function PreviewCanvas() {
   };
 
   // メディアを描画（変形適用）
-  const drawMedia = (ctx, media, clip, width, height, envelopeValue = 1.0) => {
+  const getTransformOverrides = (clip, relativeFrame) => {
+    const keyframes = clip.transformKeyframes;
+    if (!keyframes) return {};
+
+    const duration = clip.durationFrames || 1;
+    const progress = duration > 1 ? clamp(relativeFrame / (duration - 1)) : 0;
+    const overrides = {};
+
+    const opacityKeyframe = keyframes.opacity;
+    if (opacityKeyframe?.enabled) {
+      const easingFn = getEasingFn(opacityKeyframe.easing, opacityKeyframe.bezier);
+      const eased = easingFn(progress);
+      const start = opacityKeyframe.start ?? (clip.opacity ?? 100);
+      const end = opacityKeyframe.end ?? (clip.opacity ?? 100);
+      overrides.opacity = (start + (end - start) * eased) / 100;
+    }
+
+    const scaleKeyframe = keyframes.scale;
+    if (scaleKeyframe?.enabled) {
+      const easingFn = getEasingFn(scaleKeyframe.easing, scaleKeyframe.bezier);
+      const eased = easingFn(progress);
+      const start = scaleKeyframe.start ?? (clip.scale ?? 100);
+      const end = scaleKeyframe.end ?? (clip.scale ?? 100);
+      overrides.scale = (start + (end - start) * eased) / 100;
+    }
+
+    return overrides;
+  };
+
+  const drawMedia = (ctx, media, clip, width, height, envelopeValue = 1.0, relativeFrame = 0) => {
     ctx.save();
 
+    const transformOverrides = getTransformOverrides(clip, relativeFrame);
+
     // 変形パラメータ
-    const baseScale = (clip.scale || 100) / 100;
-    const baseOpacity = (clip.opacity ?? 100) / 100;
+    const baseScale = transformOverrides.scale ?? (clip.scale || 100) / 100;
+    const baseOpacity = transformOverrides.opacity ?? (clip.opacity ?? 100) / 100;
     const rotation = (clip.rotation || 0) * Math.PI / 180;
     const posX = clip.positionX || 0;
     const posY = clip.positionY || 0;
@@ -349,7 +420,7 @@ function PreviewCanvas() {
             // 旧形式または単一セグメント: filePathで直接描画
             try {
               const img = await loadImage(filePath);
-              drawMedia(ctx, img, clip, width, height, envelopeValue);
+              drawMedia(ctx, img, clip, width, height, envelopeValue, relativeFrame);
             } catch (e) {
               drawPlaceholder(ctx, clip, width, height, '#22C55E');
             }
@@ -365,7 +436,7 @@ function PreviewCanvas() {
           // 画像クリップの描画
           try {
             const img = await loadImage(filePath);
-            drawMedia(ctx, img, clip, width, height, envelopeValue);
+            drawMedia(ctx, img, clip, width, height, envelopeValue, relativeFrame);
           } catch (e) {
             drawPlaceholder(ctx, clip, width, height, '#22C55E');
           }
@@ -375,7 +446,7 @@ function PreviewCanvas() {
             const video = await getVideoElement(filePath);
             const timeInSeconds = relativeFrame / fps;
             await seekVideoToTime(video, timeInSeconds);
-            drawMedia(ctx, video, clip, width, height, envelopeValue);
+            drawMedia(ctx, video, clip, width, height, envelopeValue, relativeFrame);
           } catch (e) {
             drawPlaceholder(ctx, clip, width, height, '#3B82F6');
           }

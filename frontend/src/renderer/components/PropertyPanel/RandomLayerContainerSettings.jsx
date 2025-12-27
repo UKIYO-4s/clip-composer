@@ -10,7 +10,7 @@ import {
   saveToHistory,
 } from '../../store/timelineSlice';
 import { selectAllRandomLayers, openRandomLayerPanel } from '../../store/randomLayerSlice';
-import { Button } from '../ui';
+import { Button, Input } from '../ui';
 import { ChevronDown, Settings, Plus, Trash2, Scissors } from '../Icons';
 
 // タブボタン
@@ -69,6 +69,15 @@ const EASING_OPTIONS = [
   { value: 'ease_in', label: 'イーズイン' },
   { value: 'ease_out', label: 'イーズアウト' },
   { value: 'ease_in_out', label: 'イーズインアウト' },
+];
+
+// キーフレーム用イージング選択
+const KEYFRAME_EASING_OPTIONS = [
+  { value: 'linear', label: 'リニア' },
+  { value: 'ease-in', label: 'イーズイン' },
+  { value: 'ease-out', label: 'イーズアウト' },
+  { value: 'ease-in-out', label: 'イーズインアウト' },
+  { value: 'cubic-bezier', label: 'カスタムベジエ' },
 ];
 
 // エンベロープ設定コンポーネント
@@ -332,6 +341,28 @@ const RandomLayerContainerSettings = ({ clip, layerId, onUpdate }) => {
   const randomLayers = useSelector(selectAllRandomLayers);
   const [activeTab, setActiveTab] = useState('container'); // 'container' | 'segments'
   const [selectedSegmentId, setSelectedSegmentId] = useState(null);
+  const transformKeyframes = useMemo(() => {
+    const opacityBase = clip.opacity ?? 100;
+    const scaleBase = clip.scale ?? 100;
+    return {
+      opacity: {
+        enabled: false,
+        start: opacityBase,
+        end: opacityBase,
+        easing: 'ease-in-out',
+        bezier: [0.25, 0.1, 0.25, 1.0],
+        ...clip.transformKeyframes?.opacity,
+      },
+      scale: {
+        enabled: false,
+        start: scaleBase,
+        end: scaleBase,
+        easing: 'ease-in-out',
+        bezier: [0.25, 0.1, 0.25, 1.0],
+        ...clip.transformKeyframes?.scale,
+      },
+    };
+  }, [clip.opacity, clip.scale, clip.transformKeyframes]);
 
   // 選択中のセグメント
   const selectedSegment = useMemo(() => {
@@ -342,6 +373,25 @@ const RandomLayerContainerSettings = ({ clip, layerId, onUpdate }) => {
   const handleEnvelopeChange = (envelope) => {
     dispatch(saveToHistory());
     dispatch(updateEnvelope({ layerId, clipId: clip.id, envelope }));
+  };
+
+  const updateKeyframe = (key, updates) => {
+    onUpdate({
+      transformKeyframes: {
+        ...transformKeyframes,
+        [key]: {
+          ...transformKeyframes[key],
+          ...updates,
+        },
+      },
+    });
+  };
+
+  const updateBezier = (key, index, value) => {
+    const current = transformKeyframes[key]?.bezier || [0.25, 0.1, 0.25, 1.0];
+    const next = [...current];
+    next[index] = Math.max(0, Math.min(1, value));
+    updateKeyframe(key, { bezier: next });
   };
 
   // セグメント追加
@@ -448,6 +498,138 @@ const RandomLayerContainerSettings = ({ clip, layerId, onUpdate }) => {
                 <Settings className="w-3 h-3" />
                 ランダムレイヤー管理
               </Button>
+            </div>
+          </Section>
+
+          <Section title="キーフレーム（透明度/スケール）" defaultOpen={false}>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-xs text-ink-secondary">
+                  <input
+                    type="checkbox"
+                    checked={!!transformKeyframes.opacity.enabled}
+                    onChange={(e) => updateKeyframe('opacity', { enabled: e.target.checked })}
+                    className="accent-accent-blue"
+                  />
+                  透明度
+                </label>
+                {transformKeyframes.opacity.enabled && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="開始">
+                      <Input
+                        type="number"
+                        value={transformKeyframes.opacity.start}
+                        onChange={(e) => updateKeyframe('opacity', { start: parseInt(e.target.value) || 0 })}
+                        min={0}
+                        max={100}
+                        className="text-xs"
+                      />
+                    </Field>
+                    <Field label="終了">
+                      <Input
+                        type="number"
+                        value={transformKeyframes.opacity.end}
+                        onChange={(e) => updateKeyframe('opacity', { end: parseInt(e.target.value) || 0 })}
+                        min={0}
+                        max={100}
+                        className="text-xs"
+                      />
+                    </Field>
+                    <Field label="イージング">
+                      <select
+                        value={transformKeyframes.opacity.easing}
+                        onChange={(e) => updateKeyframe('opacity', { easing: e.target.value })}
+                        className="w-full px-2 py-1 text-xs bg-surface-sunken border border-line rounded focus:outline-none focus:border-accent-blue text-ink-primary"
+                      >
+                        {KEYFRAME_EASING_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    {transformKeyframes.opacity.easing === 'cubic-bezier' && (
+                      <div className="grid grid-cols-4 gap-2">
+                        {transformKeyframes.opacity.bezier?.map((value, index) => (
+                          <Field key={index} label={`P${index + 1}`}>
+                            <Input
+                              type="number"
+                              value={value}
+                              onChange={(e) => updateBezier('opacity', index, parseFloat(e.target.value) || 0)}
+                              min={0}
+                              max={1}
+                              step={0.01}
+                              className="text-xs"
+                            />
+                          </Field>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-xs text-ink-secondary">
+                  <input
+                    type="checkbox"
+                    checked={!!transformKeyframes.scale.enabled}
+                    onChange={(e) => updateKeyframe('scale', { enabled: e.target.checked })}
+                    className="accent-accent-blue"
+                  />
+                  スケール
+                </label>
+                {transformKeyframes.scale.enabled && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="開始">
+                      <Input
+                        type="number"
+                        value={transformKeyframes.scale.start}
+                        onChange={(e) => updateKeyframe('scale', { start: parseInt(e.target.value) || 0 })}
+                        min={0}
+                        max={400}
+                        className="text-xs"
+                      />
+                    </Field>
+                    <Field label="終了">
+                      <Input
+                        type="number"
+                        value={transformKeyframes.scale.end}
+                        onChange={(e) => updateKeyframe('scale', { end: parseInt(e.target.value) || 0 })}
+                        min={0}
+                        max={400}
+                        className="text-xs"
+                      />
+                    </Field>
+                    <Field label="イージング">
+                      <select
+                        value={transformKeyframes.scale.easing}
+                        onChange={(e) => updateKeyframe('scale', { easing: e.target.value })}
+                        className="w-full px-2 py-1 text-xs bg-surface-sunken border border-line rounded focus:outline-none focus:border-accent-blue text-ink-primary"
+                      >
+                        {KEYFRAME_EASING_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    {transformKeyframes.scale.easing === 'cubic-bezier' && (
+                      <div className="grid grid-cols-4 gap-2">
+                        {transformKeyframes.scale.bezier?.map((value, index) => (
+                          <Field key={index} label={`P${index + 1}`}>
+                            <Input
+                              type="number"
+                              value={value}
+                              onChange={(e) => updateBezier('scale', index, parseFloat(e.target.value) || 0)}
+                              min={0}
+                              max={1}
+                              step={0.01}
+                              className="text-xs"
+                            />
+                          </Field>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </Section>
         </div>
